@@ -1,7 +1,10 @@
-import re, imp, os
-import myModule
+import re, imp, os, sys
+from pythonlib_ys import main as myModule
 imp.reload(myModule)
-
+try:
+    from ipdb import set_trace
+except:
+    from pdb import set_trace
 # Chunk:
 # SentLine:
 
@@ -28,55 +31,101 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
             Sentl=True
     if Print: print(Sents2Ext)
     return Sents2Ext
- 
+
+def split_traintest(FP,Percentage=10,Where=50):
+    Sents=extract_sentences(FP)
+    TestStart=len(Sents)//(Where/100)
+    TestLen=len(Sents)//(Percentage/100)
+    TestEnd=TestStart+TestLen
+
+    return Sents[:TestStart]+Sents[TestEnd:],Sents[TestStart:TestEnd]
+
 def sentence_list(FP,IncludeEOS=True):
     if IncludeEOS:
         return re.split(r'\nEOS',open(FP,'rt').read())
     else:
         return open(FP,'rt').read().split('EOS')
 
+    
+def mark_sents(FP,FtCnts,Recover=True,Output=None):
+    #set_trace()
+    '''
+    def find_eof_errors(FP):
+  
+        FSr=open(FP)
+        LstLiNe=myModule.readline_reverse(FSr)
+        TrailEmptyLineCnt=0
+        while LstLiNe.strip()=='':
+            LstLine=myModule.readline_reverse(FSr)
+            TrailEmptyLineCnt+=1
+        
+        if LstLine!='EOS':
+            LstEOSP=False
+        return (TrailEmptyCnt,LstEOSP)    
+            
+    '''        
 
+    def mark_errors_sentlines(SentLines,FtCnts,SentCnt,FstLineNum,Recover=True):
+        MkdLines=[]
+        for (Cntr,Line) in enumerate(SentLines):
+            Wrong=something_wrong_insideline(Line,FtCnts)
+            if not Wrong:
+                MkdLines.append((Line,Line,'original'))
+            # below is when there is something wrong!!!
+            else:
+                if Recover:
+                    print('error found ('+Wrong+' at '+str(SentCnt)+'/'+str(FstLineNum+Cntr+1)+'), attempting to recover')
+                    # attempt to recover
+                    Attempted=try_and_recover(Line,Wrong)
+                    # it could return none, this is failure
+                    if Attempted is None:
+                        print('recovery failed')
+                        MkdLines.append((Line,None,Wrong))
+                    # it could return something where there still are errors
+                    elif something_wrong_insideline(Attempted,FtCnts):
+                        print('recovery failed')
+                        MkdLines.append((Line,None,Wrong))
+                    # otherwise it's success
+                    else:
+                        print('recovery successful')
+                        MkdLines.append((Line,Attempted,'recovered'))
+                else:
+                    MkdLines.append((Line,None,Wrong))
 
+        return MkdLines
 
-def filter_errors(FP,FtCnts,Recover=False,Output=None):
+    
     with open(FP,'rt') as FSr:
+       # (TrailEmptyCnt,LstEOSP)=find_eof_errors(FP)
+       # if not Recover and not (TrailEmptyCnt and LstEOSP):
+       #     sys.exit('there is an EOF error, either empty trailing lines or no EOS')
+            
         extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
 
-        FilteredSents=[]; SentCnt=0; NextLine=True
+        MkdSents=[]; SentCnt=LineCnt=0; NextLine=True
         while NextLine:
-            FSr,Sent,_,NextLine=extract_chunk(FSr)
-            if Sent.strip()=='':
-                if Recover:
-                    FilteredLinesPerSent=None
+            FSr,Sent,LineCntPerSent,NextLine=extract_chunk(FSr)
+            if NextLine:
+                LineCnt+=LineCntPerSent;SentCnt+=1
+                if Sent.strip()=='':
+                    if Recover:
+                        MkdSents.append([(Sent,None,'empty sent')])
                 else:
-                    FilteredLinesPerSent=(Sent,'empty sent',)
-            else:
-                SentCnt+=1
-                FilteredLinesPerSent=filter_errors_sent(Sent.strip().split('\n'),FtCnts,Recover=Recover)
-            FilteredSents.append(FilteredLinesPerSent)
-            if not NextLine and Sent[-1]!='EOS':
-                FilteredSents.append(('','tail EOS absent',))
-    return FilteredSents
+                    MkdLines=mark_errors_sentlines(Sent.strip().split('\n'),FtCnts,SentCnt,LineCnt,Recover=Recover)
+                    MkdSents.append(MkdLines)
+                                       
 
-def filter_errors_sent(SentLines,FtCnts=[7,9],Recover=False):
-    FilteredLines=[]
-    for Line in SentLines:
-        Wrong=something_wrong_insideline(Line,FtCnts)
-        if not Wrong:
-            FilteredLines.append(Line)
+    return MkdSents
+
+
+def remove_badsents(FP,FtCnts):
+    MkdSents=mark_sents(FP,FtCnts)
+    for MkdSent in MkdSents:
+        if any(not MkdLine[1] for MkdLine in MkdSent):
+            pass
         else:
-            if Recover:
-                Attempted=try_and_recover(Line,Wrong)
-                if Attempted is None:
-                    continue
-                elif not something_wrong_insideline(Attempted,FtCnts):
-                    FilteredLines.append(Attempted)
-                    continue
-
-            FilteredLines.append((Line,Wrong,))
-
-    return FilteredLines
-
+            MkdLines='\n'.join([MkdLine[0] for MkdLine in MkdSent])
+            sys.stdout.write(MkdLines+'\nEOS\n')
 
 def something_wrong_insideline(Line,FtCnts):
     if Line.strip()=='':
