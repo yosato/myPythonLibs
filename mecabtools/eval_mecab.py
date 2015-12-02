@@ -1,5 +1,5 @@
 import os, sys, copy, re, imp, datetime
-import myModule
+from pythonlib_ys import main as myModule
 import mecabtools
 
 imp.reload(myModule)
