@@ -1,5 +1,8 @@
 import os, sys, copy, re, imp, datetime
-import myModule
+
+sys.path.append('./../myPythonLibs')
+#sys.path.append(os.path.join(os.getenv('HOME'),'myProjects','my'))
+from pythonlib_ys import main as myModule
 import mecabtools
 
 imp.reload(myModule)

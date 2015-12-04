@@ -1,4 +1,5 @@
 import re, imp, os, sys
+sys.path.append('./../myPythonLibs')
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 try:
