@@ -96,7 +96,7 @@ def mark_sents(FP,FtCnts,Recover=True,Output=None):
         return MkdLines
 
     
-    with open(FP,'rt') as FSr:
+    with open(FP,'rt',encoding='utf-8') as FSr:
        # (TrailEmptyCnt,LstEOSP)=find_eof_errors(FP)
        # if not Recover and not (TrailEmptyCnt and LstEOSP):
        #     sys.exit('there is an EOF error, either empty trailing lines or no EOS')
