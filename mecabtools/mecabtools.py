@@ -1,4 +1,4 @@
-import re, imp, os, sys
+import re, imp, os, sys, time
 sys.path.append('./../myPythonLibs')
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
@@ -9,11 +9,15 @@ except:
 # Chunk:
 # SentLine:
 
+
+print('my default encoding is: '+sys.getdefaultencoding())
+
+
 def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
         if not ReturnRaw:
             return Chunk.strip().split('\n')
-    FSr=open(FileP,'rt')
+    FSr=open(FileP,'rt',encoding='utf-8')
     extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
     FSr,Chunk,_,NxtLine=extract_chunk(FSr)
     Sentl=False
@@ -43,9 +47,9 @@ def split_traintest(FP,Percentage=10,Where=50):
 
 def sentence_list(FP,IncludeEOS=True):
     if IncludeEOS:
-        return re.split(r'\nEOS',open(FP,'rt').read())
+        return re.split(r'\nEOS',open(FP,'rt',encoding='utf-8').read())
     else:
-        return open(FP,'rt').read().split('EOS')
+        return open(FP,'rt',encoding='utf-8').read().split('EOS')
 
     
 def mark_sents(FP,FtCnts,Recover=True,Output=None):
@@ -182,15 +186,15 @@ def try_and_recover(Line,Wrong):
 def split_file_into_n(FP,N):
     Sents=sentence_list(FP)
     SplitIntvl=len(Sents)//N
-    with open(FP,'rt') as FSr:
+    with open(FP,'rt',encoding='utf-8') as FSr:
         Chunk=[];ChunkCnt=1
         for (Cntr,LiNe) in enumerate(FSr):
             Chunk.append(LiNe)
             if Cntr!=0 and Cntr % SplitIntvl==0:
-                open(FP+str(ChunkCnt),'wt').write(''.join(Chunk)+'EOS\n')
+                open(FP+str(ChunkCnt),'wt',encoding='utf-8').write(''.join(Chunk)+'EOS\n')
                 Chunk=[];ChunkCnt=ChunkCnt+1
                 if ChunkCnt==N:
-                    open(FP+str(ChunkCnt),'wt').write(FSr.read())
+                    open(FP+str(ChunkCnt),'wt',encoding='utf-8').write(FSr.read())
 
 
 def extract_sentences_fromsolfile(SolFileP):
@@ -213,7 +217,7 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
         FNR=os.path.basename(FPR)
         FNS=os.path.basename(FPS)
         
-        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt') as FSwErr:
+        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt',encoding='utf-8') as FSwErr:
             for SentNum,SentR,SentS in Errors:
                 FSwErr.write('Sent '+str(SentNum)+': '+SentR+'\t'+SentS+'\n')
 
@@ -261,8 +265,8 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
                     return False
 
     if not Strict:
-        FSwR=open(FPR+'.reduced','wt')
-        FSwS=open(FPS+'.reduced','wt')
+        FSwR=open(FPR+'.reduced','wt',encoding='utf-8')
+        FSwS=open(FPS+'.reduced','wt',encoding='utf-8')
         for _,SentR,SentS in Corrects:
             FSwR.write('\n'.join(SentR)+'\nEOS\n')
             FSwS.write('\n'.join(SentS)+'\nEOS\n')
