@@ -8,7 +8,7 @@ import mecabtools
 imp.reload(myModule)
 imp.reload(mecabtools)
 
-Debug=False
+Debug=1
 
 class WdParse:
     def __init__(self,Line,SPos):
@@ -51,26 +51,52 @@ class AmbSols:
                 Sentl=True
         return Bool,PrvSeq
    
-def main0(ResFP,SolFP):
-    Strict=False
-    if not mecabtools.files_corresponding_p(ResFP,SolFP,Strict=Strict):
+def main0(ResFP,SolFP,Strict=True):
+    if not mecabtools.files_corresponding_p(ResFP,SolFP,Strict=True):
         sys.exit('result and solutions do not seem aligned')
-
-    if not Strict:
-        ResFPRed=ResFP+'.reduced'; SolFPRed=SolFP+'.reduced'
-        exist_and_new_p=lambda FP: os.path.isfile(FP) and (datetime.datetime.fromtimestamp(os.path.getctime(FP))-datetime.datetime.now()).seconds<180
-        if exist_and_new_p(ResFP) and exist_and_new_p(SolFP):
-            FPR=ResFP+'.reduced'; FPS=SolFP+'.reduced'
 
     ResSentsRaw=mecabtools.extract_sentences(ResFP)
     SolSentsRaw=mecabtools.extract_sentences(SolFP)
 
-    process_sentsraw=lambda SentsRaw: [process_chunk(SentRaw) for SentRaw in SentsRaw]
-    SentPairs=zip(process_sentsraw(ResSentsRaw),process_sentsraw(SolSentsRaw))
-    Scores=score_sents(SentPairs)
+    CumScores=([0,0,0],[0,0,0],[0,0])
+    #Cntr=0
+    for Cntr,ResSentRaw in enumerate(ResSentsRaw):
+        SolSentRaw=SolSentsRaw.__next__()
+        if Debug>=2:
+            print(ResSentRaw)
+        MkdSentSol=mecabtools.mark_sentlines(SolSentRaw,[7,9])
+        #for SentPair in SentPairs:
+        if all(MkdLine[1] for MkdLine in MkdSentSol):
+            if not all(MkdLine[2]=='original' for MkdLine in MkdSentSol):
+                SolSentRaw=[ MkdLine[1] for MkdLine in MkdSentSol ]
+            print(SolSentRaw)
+                
+            ResSent=process_chunk(ResSentRaw)
+            try:
+                SolSent=process_chunk(SolSentRaw)
+                Scores=score_sent(ResSent,SolSent)
+                CumScores=cumulate_scores(CumScores,Scores)
+            except:
+                process_chunk(SolSentRaw)
 
-    return calculate_fscore(Scores)
 
+    return calculate_fscore(CumScores)
+
+def process_sentsraw(SentsRaw):
+    PSents=[]
+    for SentRaw in SentsRaw:
+        try:
+            MkdLines=mecabtools.mark_sentlines(SentRaw,[7,9])
+            if any(Line[1] is None for Line in MkdLines):
+                pass
+            else:
+                ProcessedSent=process_chunk(SentRaw)
+                PSents.append(ProcessedSent)
+                #yield ProcessedSent
+        except:
+            process_chunk(SentRaw)
+    return PSents
+    
 
 def calculate_fscore(Scores):
     Score,[RCnt,SCnt]=Scores
@@ -285,6 +311,7 @@ def process_chunk(SolLines):
                 WdP=WdParse(Line,OrgPos)
                 Ambs[CurNum].append(WdP)
                 Pos=Pos+WdP.leninchar
+                
             Line=Lines.pop(0)
         return Lines,AmbSols(Ambs),Pos
 
@@ -297,6 +324,7 @@ def process_chunk(SolLines):
             if Line=='====':
                 SolLines,Ambs,Pos=amb_miniloop(SolLines,Pos)
                 Els.append(Ambs)
+                
             else:
                 WdP=WdParse(Line,Pos)
                 Els.append(WdP)

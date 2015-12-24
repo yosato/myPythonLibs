@@ -25,11 +25,11 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     while not Sentl:
         Cntr+=1
         if LineNums=='all':
-            Sents2Ext.append(chunkprocess(Chunk,ReturnRaw))
+            yield chunkprocess(Chunk,ReturnRaw)
         else:
             if Cntr in LineNums:
                 LineNums.remove(Cntr)
-                Sents2Ext.append(chunkprocess(Chunk,ReturnRaw))
+                yield chunkprocess(Chunk,ReturnRaw)
 
         FSr,Chunk,_,NxtLine=extract_chunk(FSr)
         if not LineNums or not NxtLine:
@@ -69,35 +69,7 @@ def mark_sents(FP,FtCnts,Recover=True,Output=None):
         return (TrailEmptyCnt,LstEOSP)    
             
     '''        
-
-    def mark_errors_sentlines(SentLines,FtCnts,SentCnt,FstLineNum,Recover=True):
-        MkdLines=[]
-        for (Cntr,Line) in enumerate(SentLines):
-            Wrong=something_wrong_insideline(Line,FtCnts)
-            if not Wrong:
-                MkdLines.append((Line,Line,'original'))
-            # below is when there is something wrong!!!
-            else:
-                if Recover:
-                    print('error found ('+Wrong+' at '+str(SentCnt)+'/'+str(FstLineNum+Cntr+1)+'), attempting to recover')
-                    # attempt to recover
-                    Attempted=try_and_recover(Line,Wrong)
-                    # it could return none, this is failure
-                    if Attempted is None:
-                        print('recovery failed')
-                        MkdLines.append((Line,None,Wrong))
-                    # it could return something where there still are errors
-                    elif something_wrong_insideline(Attempted,FtCnts):
-                        print('recovery failed')
-                        MkdLines.append((Line,None,Wrong))
-                    # otherwise it's success
-                    else:
-                        print('recovery successful')
-                        MkdLines.append((Line,Attempted,'recovered'))
-                else:
-                    MkdLines.append((Line,None,Wrong))
-
-        return MkdLines
+  #      return MkdLines
 
     
     with open(FP,'rt',encoding='utf-8') as FSr:
@@ -114,13 +86,47 @@ def mark_sents(FP,FtCnts,Recover=True,Output=None):
                 LineCnt+=LineCntPerSent;SentCnt+=1
                 if Sent.strip()=='':
                     if Recover:
-                        MkdSents.append([(Sent,None,'empty sent')])
+                        #MkdSents.append([(Sent,None,'empty sent')])
+                        yield [(Sent,None,'empty sent')]
                 else:
-                    MkdLines=mark_errors_sentlines(Sent.strip().split('\n'),FtCnts,SentCnt,LineCnt,Recover=Recover)
-                    MkdSents.append(MkdLines)
-                                       
+                    MkdLines=mark_sentlines(Sent.strip().split('\n'),FtCnts,Recover=Recover)
+                    #MkdSents.append(MkdLines)
+                    yield MkdLines
+#    return MkdSents
 
-    return MkdSents
+
+def mark_sentlines(SentLines,FtCnts,Recover=True):
+        MkdLines=[]
+        for (Cntr,Line) in enumerate(SentLines):
+            Wrong=something_wrong_insideline(Line,FtCnts)
+            if not Wrong:
+                ToAppend=(Line,Line,'original')
+                
+            # below is when there is something wrong!!!
+            else:
+                if Recover:
+                    print('error found, attempting to recover')
+                    # attempt to recover
+                    Attempted=try_and_recover(Line,Wrong)
+                    # it could return none, this is failure
+                    if Attempted is None:
+                        print('recovery failed')
+                        ToAppend=(Line,None,Wrong)
+                
+                    # it could return something where there still are errors
+                    elif something_wrong_insideline(Attempted,FtCnts):
+                        print('recovery failed')
+                        ToAppend=(Line,None,Wrong)
+                    # otherwise it's success
+                    else:
+                        print('recovery successful')
+                        ToAppend=(Line,Attempted,'recovered')
+                        
+                else:
+                    ToAppend=(Line,None,Wrong)
+            MkdLines.append(ToAppend)
+        return MkdLines
+                    
 
 
 def remove_badsents(FP,FtCnts):
@@ -135,6 +141,8 @@ def remove_badsents(FP,FtCnts):
 def something_wrong_insideline(Line,FtCnts):
     if Line.strip()=='':
         return 'empty line'
+    elif Line=='====' or re.match(r'@[1-9]',Line):
+        return None
     else:
         if len(re.findall(r'\s',Line))>1:
             return 'redundant whitespaces'
@@ -223,12 +231,15 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
 
     Bool=True
 
-    SentLinesR=extract_sentences(FPR)
-    SentLinesS=extract_sentences(FPS)
+    SentLinesR=[SentL for SentL in extract_sentences(FPR)]
+    SentLinesS=[SentL for SentL in extract_sentences(FPS)]
 
-    Thresh=len(SentLinesR)//15
+    LenR=len(SentLinesR)
+    LenS=len(SentLinesS)
     
-    LenDiff=len(SentLinesR)-len(SentLinesS)
+    Thresh=LenR//15
+    
+    LenDiff=LenR-LenS
     if LenDiff!=0:
         if LenDiff>0:
             Larger='results'
