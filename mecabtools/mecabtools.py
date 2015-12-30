@@ -1,4 +1,5 @@
-import re, imp, os, sys, time
+import re, imp, os, sys, time, shutil
+from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
@@ -9,9 +10,14 @@ except:
 # Chunk:
 # SentLine:
 
+Debug=0
 
-print('my default encoding is: '+sys.getdefaultencoding())
-
+def count_sentences(FP):
+    Cntr=0
+    for LiNe in open(FP):
+        if LiNe.strip()=='EOS':
+            Cntr+=1
+    return Cntr
 
 def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
@@ -37,20 +43,56 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     if Print: print(Sents2Ext)
     return Sents2Ext
 
-def split_traintest(FP,Percentage=10,Where=50):
-    Sents=extract_sentences(FP)
-    TestStart=len(Sents)//(Where/100)
-    TestLen=len(Sents)//(Percentage/100)
-    TestEnd=TestStart+TestLen
+def already_in_anothersentlist_p(TestSent,Sents):
+    TestSentLen=len(TestSent)
+    for Sent in Sents:
+        SentLen=len(Sent)
+        (Longer,LongerLen),(Shorter,ShorterLen)=(((TestSent,TestSentLen),(Sent,SentLen)) if TestSentLen>=SentLen else ((Sent,SentLen),(TestSent,TestSentLen)))
+        if ShorterLen>8 and Shorter in Longer:
+            if Debug:  print('Sentence '+TestSent+' found in list: '+Sent)
+            return True
+        else:
+            if ShorterLen>10 and LongerLen-ShorterLen<5:
+                Similarity=SequenceMatcher(a=TestSent,b=Sent).ratio()
+                if Similarity>0.9:
+                    if Debug:  print('Very similar sentence '+TestSent+' found in list: '+Sent)
+                    return True
 
-    return Sents[:TestStart]+Sents[TestEnd:],Sents[TestStart:TestEnd]
+    return False
+
+def produce_traintest(OrgFP,TestSpec,CheckAgainst=None):
+    (WhereFrom,TestNum,PercentP)=TestSpec
+    SentCnt=count_sentences(OrgFP)
+    if PercentP:
+        WhereFrom=int(SentCnt//(100/WhereFrom))
+        TestNum=int(SentCnt//(100/TestNum))
+    if CheckAgainst:
+        SentsAlreadyInTest=open(CheckAgainst).read().strip().split('\n')
+    FSwTest=open(myModule.get_stem_ext(OrgFP)[0]+'_test.mecab','wt')
+    FSwTrain=open(myModule.get_stem_ext(OrgFP)[0]+'_train.mecab','wt')
+    TestCntr=0    
+    for Cntr,Sent in enumerate(extract_sentences(OrgFP)):
+        #AlreadyInTestP=False
+        if CheckAgainst:
+            SentStr=''.join([ Line.split('\t')[0] for Line in Sent ])
+            if already_in_anothersentlist_p(SentStr,SentsAlreadyInTest):
+                TestCntr+=1
+                continue
+        if Cntr+1>=WhereFrom and TestCntr<TestNum:
+            TestCntr+=1
+            FSwToWrite=FSwTest
+        else:
+            FSwToWrite=FSwTrain
+        FSwToWrite.write('\n'.join(Sent)+'\nEOS\n')
+    FSwTest.close()
+    FSwTrain.close()
 
 def sentence_list(FP,IncludeEOS=True):
     if IncludeEOS:
         return re.split(r'\nEOS',open(FP,'rt',encoding='utf-8').read())
     else:
         return open(FP,'rt',encoding='utf-8').read().split('EOS')
-
+    
     
 def mark_sents(FP,FtCnts,Recover=True,Output=None):
     #set_trace()
@@ -89,6 +131,8 @@ def mark_sents(FP,FtCnts,Recover=True,Output=None):
                         #MkdSents.append([(Sent,None,'empty sent')])
                         yield [(Sent,None,'empty sent')]
                 else:
+                    if Debug:
+                        print('Now at '+str(LineCnt))
                     MkdLines=mark_sentlines(Sent.strip().split('\n'),FtCnts,Recover=Recover)
                     #MkdSents.append(MkdLines)
                     yield MkdLines
@@ -105,22 +149,25 @@ def mark_sentlines(SentLines,FtCnts,Recover=True):
             # below is when there is something wrong!!!
             else:
                 if Recover:
-                    print('error found, attempting to recover')
+                    ErrorMsgPrefix='error found ('+Wrong+', "'+Line[:10]+'"), attempting to recover..'
                     # attempt to recover
                     Attempted=try_and_recover(Line,Wrong)
                     # it could return none, this is failure
                     if Attempted is None:
-                        print('recovery failed')
+                        SuccessP=False
                         ToAppend=(Line,None,Wrong)
                 
                     # it could return something where there still are errors
                     elif something_wrong_insideline(Attempted,FtCnts):
-                        print('recovery failed')
+                        SuccessP=False
                         ToAppend=(Line,None,Wrong)
                     # otherwise it's success
                     else:
-                        print('recovery successful')
+                        SuccessP=True
                         ToAppend=(Line,Attempted,'recovered')
+                    if Debug:
+                        ErrorMsgSuffix=('successful' if SuccessP else 'failed')
+                        sys.stderr.write('\n'+ErrorMsgPrefix+' '+ErrorMsgSuffix)
                         
                 else:
                     ToAppend=(Line,None,Wrong)
@@ -128,7 +175,48 @@ def mark_sentlines(SentLines,FtCnts,Recover=True):
         return MkdLines
                     
 
-
+def markedsent2output(MkdSent):
+    MecabSent=[ MkdLine[1] for MkdLine in MkdSent ]
+    return '\n'.join(MecabSent)+'\nEOS\n'
+    
+def markedsents2outputs(MkdSents,OrgFP,StrictP=True,MoveTo=None):
+    ErrorOutput=OrgFP+'.errors'
+    ReducedOutput=myModule.get_stem_ext(OrgFP)[0]+'.reduced.mecab'
+    FSwE=open(ErrorOutput,'wt')
+    FSwR=open(ReducedOutput,'wt')
+    ErrorCnt=0; LineCntr=0
+    for Cntr,MkdSent in enumerate(MkdSents):
+        LineCntr+=len(MkdSent)+1
+        if not all(Line[-1]=='original' for Line in MkdSent):
+            if StrictP or any(Line[-2] is None for Line in  MkdSent):
+                ErrorCnt+=1
+                FSwE.write(str(Cntr+1)+'; '+str(LineCntr)+'\n'+'\n'.join([ MkdLine[0]+'\t'+MkdLine[-1] for MkdLine in MkdSent])+'\n')
+            else:
+                FSwR.write(markedsent2output(MkdSent))
+        else:
+            MkdSentM=markedsent2output(MkdSent)
+            FSwR.write(MkdSentM)
+    FSwE.close()
+    FSwR.close()
+    if ErrorCnt==0:
+        os.remove(ReducedOutput)
+        os.remove(ErrorOutput)
+        print('No error found for file '+OrgFP)
+        time.sleep(2)
+        return True
+    else:
+        print(str(ErrorCnt)+' error(s) found for file '+OrgFP)
+        if not MoveTo:
+            MoveTo=os.getcwd
+        shutil.copy(OrgFP,MoveTo)
+        shutil.copy(ErrorOutput,MoveTo)
+        os.remove(OrgFP)
+        os.remove(ErrorOutput)
+        print('Original file moved to '+MoveTo)
+        time.sleep(2)
+        return False
+            
+    
 def remove_badsents(FP,FtCnts):
     MkdSents=mark_sents(FP,FtCnts)
     for MkdSent in MkdSents:
@@ -146,6 +234,10 @@ def something_wrong_insideline(Line,FtCnts):
     else:
         if len(re.findall(r'\s',Line))>1:
             return 'redundant whitespaces'
+        elif Line.strip()[-1] == ',':
+            return 'ending with comma'
+        elif  '\t' not in Line:
+            return 'no tab in line'
         elif Line!='EOS':
             CurFtCnt=len(Line.split('\t')[-1].split(','))
             if CurFtCnt not in FtCnts:
@@ -162,7 +254,6 @@ def stringify_filteredsents(Sents):
             else:
                 CorrectStrs.append(Line)
     return WrongStrs,CorrectStrs
-
                 
 
 def stringify_wrongline(WrongLineTup):

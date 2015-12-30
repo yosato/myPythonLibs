@@ -54,6 +54,10 @@ class TestMecabTools(unittest.TestCase):
         
 #        self.corrrects=[ Line for (Cntr,Line) in enumerate(AllLines) if Cntr+1 not in WrongInds ]
 
+    def test05_generate_traintest(self):
+        set_trace()
+        mecabtools.generate_traintest('/home/yosato/mecabKansaiModels/data/corpora/clean/KSJ001F3.mecab',(90,1,True),CheckAgainst='/home/yosato/mecabKansaiModels/testfiles/test_sentences_kansai.txt')
+        
     def test10_something_wrong_insideline(self):
         AllLines=self.alllines
         AllegedErrorType=mecabtools.something_wrong_insideline(AllLines[1],[7,9])

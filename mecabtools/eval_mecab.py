@@ -8,7 +8,7 @@ import mecabtools
 imp.reload(myModule)
 imp.reload(mecabtools)
 
-Debug=1
+Debug=0
 
 class WdParse:
     def __init__(self,Line,SPos):
@@ -69,7 +69,7 @@ def main0(ResFP,SolFP,Strict=True):
         if all(MkdLine[1] for MkdLine in MkdSentSol):
             if not all(MkdLine[2]=='original' for MkdLine in MkdSentSol):
                 SolSentRaw=[ MkdLine[1] for MkdLine in MkdSentSol ]
-            print(SolSentRaw)
+            #print(SolSentRaw)
                 
             ResSent=process_chunk(ResSentRaw)
             try:
