@@ -27,7 +27,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
     FSr,Chunk,_,NxtLine=extract_chunk(FSr)
     Sentl=False
-    Cntr=0; Sents2Ext=[]
+    Cntr=0
     while not Sentl:
         Cntr+=1
         if LineNums=='all':
@@ -40,8 +40,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
         FSr,Chunk,_,NxtLine=extract_chunk(FSr)
         if not LineNums or not NxtLine:
             Sentl=True
-    if Print: print(Sents2Ext)
-    return Sents2Ext
+
 
 def already_in_anothersentlist_p(TestSent,Sents):
     TestSentLen=len(TestSent)
