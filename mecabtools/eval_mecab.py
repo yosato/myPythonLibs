@@ -8,7 +8,7 @@ import mecabtools
 imp.reload(myModule)
 imp.reload(mecabtools)
 
-Debug=0
+Debug=1
 
 class WdParse:
     def __init__(self,Line,SPos):
@@ -51,7 +51,7 @@ class AmbSols:
                 Sentl=True
         return Bool,PrvSeq
    
-def main0(ResFP,SolFP,Strict=True):
+def main0(ResFP,SolFP,Strict=True,NoAmb=False):
     if not mecabtools.files_corresponding_p(ResFP,SolFP,Strict=True):
         sys.exit('result and solutions do not seem aligned')
 
@@ -73,14 +73,59 @@ def main0(ResFP,SolFP,Strict=True):
                 
             ResSent=process_chunk(ResSentRaw)
             try:
-                SolSent=process_chunk(SolSentRaw)
+                SolSent=process_chunk(SolSentRaw,NoAmb)
                 Scores=score_sent(ResSent,SolSent)
+                if Debug:
+                    print('Sent '+str(Cntr+1))
+                    print(Scores)
                 CumScores=cumulate_scores(CumScores,Scores)
             except:
-                process_chunk(SolSentRaw)
+                process_chunk(SolSentRaw,NoAmb)
 
 
     return calculate_fscore(CumScores)
+
+
+def process_chunk(SolLines,NoAmb=False):
+
+    def amb_miniloop(Lines, OrgPos):
+        Ambs=[];CurNum=-1
+        Line=Lines.pop(0)
+        while Line!='====':
+            if Line.startswith('@'):
+                Pos=OrgPos
+                CurNum+=1
+                Ambs.append([])
+            else:
+                WdP=WdParse(Line,OrgPos)
+                Ambs[CurNum].append(WdP)
+                Pos=Pos+WdP.leninchar
+                
+            Line=Lines.pop(0)
+        return Lines,AmbSols(Ambs),Pos
+
+    Sentl=False
+    Els=[]; Pos=0; Fst=True
+    while not Sentl:
+        if Fst:
+            Fst=False
+        else:
+            if Line=='====':
+                SolLines,Ambs,Pos=amb_miniloop(SolLines,Pos)
+                if NoAmb:
+                    Els.extend(Ambs.solutions[0])
+                else:
+                    Els.append(Ambs)
+            else:
+                WdP=WdParse(Line,Pos)
+                Els.append(WdP)
+                Pos=Pos+WdP.leninchar
+           
+        if not SolLines:
+            Sentl=True
+        else:
+            Line=SolLines.pop(0)
+    return Els
 
 def process_sentsraw(SentsRaw):
     PSents=[]
@@ -114,10 +159,10 @@ def score_sents(SentPairs):
     CumScores=([0,0,0],[0,0,0],[0,0]);Cntr=0
     for ResSent,SolSent in SentPairs:
         Cntr+=1
-        if Debug:  print('Sent '+str(Cntr))
+        if Debug>=2:  print('Sent '+str(Cntr))
         Scores=score_sent(ResSent,SolSent)
         CumScores=cumulate_scores(CumScores,Scores)
-        if Debug: print(CumScores)
+        if Debug>=2: print(CumScores)
     return CumScores
 
 def score_sent(ResSent,SolSent):
@@ -140,8 +185,7 @@ def score_sent(ResSent,SolSent):
         Score,ChosenReading=score_amb(SolAmb,OrgResSent)
 
         # you decide how many resunit to remove
-        SolSeqLenInChars=SolAmb.leninchar
-        NewResSent,ConsumedResUnitCnt=closest_smaller(OrgResSent,SolSeqLenInChars)
+        NewResSent,ConsumedResUnitCnt=closest_smaller(OrgResSent,SolAmb.leninchar)
 
         if not ChosenReading:
             SolCnt=len(SolAmb.solutions[0])
@@ -161,10 +205,10 @@ def score_sent(ResSent,SolSent):
 
     CumScores=([0,0,0],[0,0,0],[0,0])
     while ResSent and SolSent:
-        if Debug:
+        if Debug>=2:
             print('Doing with result "'+ResSent[0].sequence+'" against solution "'+SolSent[0].sequence+'"')
         ResSent,SolSent,CumScores=score_sent_iter(ResSent,SolSent,CumScores)
-        if Debug:  print(CumScores)
+
             
     return CumScores
 
@@ -278,13 +322,17 @@ def closest_smaller(ResSent,SolLenInChars):
         CurResPos=ResSent[0].startpos
         GoalPos=CurResPos+SolLenInChars
         ResUnitCnt = 0
-        while CurResPos<=GoalPos:
-            ResUnitCnt+=1
-            if len(ResSent)>ResUnitCnt+1:
-                CurEl=ResSent[ResUnitCnt+1]
-                CurResPos=CurEl.startpos
-            else:
+        while True:
+            if CurResPos>GoalPos:
                 break
+            else:
+                ResUnitCnt+=1
+                CurResPos=ResSent[ResUnitCnt].startpos
+            #if len(ResSent)>ResUnitCnt+1:
+            #    CurEl=ResSent[ResUnitCnt]
+            #    CurResPos=CurEl.startpos
+            #else:
+            #    break
         ResUnitCnt2Reduce=ResUnitCnt-1
         return ResSent[ResUnitCnt2Reduce:],ResUnitCnt2Reduce
 
@@ -297,56 +345,20 @@ def cumulate_scores(Scores1,Scores2):
     return (bitwise_add(PScores[0],PScores[1]),bitwise_add(ElCnts[0],ElCnts[1]))
 
 
-def process_chunk(SolLines):
 
-    def amb_miniloop(Lines, OrgPos):
-        Ambs=[];CurNum=-1
-        Line=Lines.pop(0)
-        while Line!='====':
-            if Line.startswith('@'):
-                Pos=OrgPos
-                CurNum+=1
-                Ambs.append([])
-            else:
-                WdP=WdParse(Line,OrgPos)
-                Ambs[CurNum].append(WdP)
-                Pos=Pos+WdP.leninchar
-                
-            Line=Lines.pop(0)
-        return Lines,AmbSols(Ambs),Pos
-
-    Sentl=False
-    Els=[]; Pos=0; Fst=True
-    while not Sentl:
-        if Fst:
-            Fst=False
-        else:
-            if Line=='====':
-                SolLines,Ambs,Pos=amb_miniloop(SolLines,Pos)
-                Els.append(Ambs)
-                
-            else:
-                WdP=WdParse(Line,Pos)
-                Els.append(WdP)
-                Pos=Pos+WdP.leninchar
-           
-        if not SolLines:
-            Sentl=True
-        else:
-            Line=SolLines.pop(0)
-    return Els
 
 def main():
-    Args=sys.argv
-    if len(Args)!=3:
-        sys.exit('we need two args, result and solution filepaths')
-    
-    FPs=Args[1:3]
+    import argparse
+    Parser=argparse.ArgumentParser()
+    Parser.add_argument('-r','--results',required=True)
+    Parser.add_argument('-s','--solutions',required=True)
+    Parser.add_argument('--no-amb',action='store_true')
+    Args=Parser.parse_args()
 
-    if not all([ os.path.isfile(FP) for FP in FPs ]):
+    if not all([ os.path.isfile(FP) for FP in (Args.results,Args.solutions) ]):
         sys.exit('one of the files not found')
 
-    Scores=main0(Args[1],Args[2])
+    Scores=main0(Args.results,Args.solutions,NoAmb=Args.no_amb)
     
     print('\t'.join(['','Precision','Recall','\tFScore']))
     for Level,PRF in Scores:
