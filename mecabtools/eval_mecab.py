@@ -8,7 +8,7 @@ import mecabtools
 imp.reload(myModule)
 imp.reload(mecabtools)
 
-Debug=2
+Debug=0
 
 class WdParse:
     def __init__(self,Line,SPos):
@@ -232,16 +232,6 @@ def highest_scores(ScoresL):
         Highest=higher_scores(Cur,Prv)
     return Highest
 
-def higher_lor(Scores1,Scores2):
-    if Scores1==[0,0,0] and Scores2==[0,0,0]:
-        return None
-    elif Scores1[-1]>Scores2[-1]:
-        return 'left'
-    elif Scores1[-2]>Scores2[-2]:
-        return 'left'
-    elif Scores1[-3]>Scores2[-3]:
-        return 'left'
-    return 'right'
 
 def relative_bitscore(Bits):
     Score=0
