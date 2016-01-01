@@ -1,4 +1,4 @@
-import os, sys, copy, re, imp, datetime
+import os, sys, copy, imp, math
 
 sys.path.append('./../myPythonLibs')
 #sys.path.append(os.path.join(os.getenv('HOME'),'myProjects','my'))
@@ -8,7 +8,7 @@ import mecabtools
 imp.reload(myModule)
 imp.reload(mecabtools)
 
-Debug=1
+Debug=2
 
 class WdParse:
     def __init__(self,Line,SPos):
@@ -61,9 +61,12 @@ def main0(ResFP,SolFP,Strict=True,NoAmb=False):
     CumScores=([0,0,0],[0,0,0],[0,0])
     #Cntr=0
     for Cntr,ResSentRaw in enumerate(ResSentsRaw):
+        if Debug:
+            print('Sent '+str(Cntr+1)+': '+''.join([Line.split('\t')[0] for Line in ResSentRaw]))
         SolSentRaw=SolSentsRaw.__next__()
         if Debug>=2:
             print(ResSentRaw)
+            print(SolSentRaw)
         MkdSentSol=mecabtools.mark_sentlines(SolSentRaw,[7,9])
         #for SentPair in SentPairs:
         if all(MkdLine[1] for MkdLine in MkdSentSol):
@@ -72,17 +75,12 @@ def main0(ResFP,SolFP,Strict=True,NoAmb=False):
             #print(SolSentRaw)
                 
             ResSent=process_chunk(ResSentRaw)
-            try:
-                SolSent=process_chunk(SolSentRaw,NoAmb)
-                Scores=score_sent(ResSent,SolSent)
-                if Debug:
-                    print('Sent '+str(Cntr+1))
-                    print(Scores)
-                CumScores=cumulate_scores(CumScores,Scores)
-            except:
-                process_chunk(SolSentRaw,NoAmb)
-
-
+            SolSent=process_chunk(SolSentRaw,NoAmb)
+            Scores=score_sent(ResSent,SolSent)
+            if Debug:
+                print(Scores)
+            CumScores=cumulate_scores(CumScores,Scores)
+            
     return calculate_fscore(CumScores)
 
 
@@ -245,6 +243,12 @@ def higher_lor(Scores1,Scores2):
         return 'left'
     return 'right'
 
+def relative_bitscore(Bits):
+    Score=0
+    for Cntr,Bit in enumerate(Bits):
+        Score+=Bit*math.pow(2,Cntr)
+    return Score
+
 def bitwise_add(Iter1,Iter2):
     return [ Tup[0]+Tup[1] for Tup in zip(Iter1,Iter2) ]
 
@@ -262,14 +266,16 @@ def score_amb(SolAmb,ResSent):
 
         return ScoreP
 
-    Highest=[0,0,0]
+    HighestRelBScore=0;Highest=[0,0,0]
     ChosenReading=None
     # reading level
     for Reading in SolAmb.solutions:
         # score a reading, and compare
         Score=score_reading(Reading,ResSent)
-        if higher_lor(Highest,Score)=='right':
+        CurRelBScore=relative_bitscore(Score)
+        if CurRelBScore>HighestRelBScore:
             Highest=Score
+            HighestRelBScore=CurRelBScore
             ChosenReading=Reading
 
     return Highest,ChosenReading
@@ -322,11 +328,15 @@ def closest_smaller(ResSent,SolLenInChars):
         CurResPos=ResSent[0].startpos
         GoalPos=CurResPos+SolLenInChars
         ResUnitCnt = 0
+        #LstResUnit=len(ResSent)-1
         while True:
             if CurResPos>GoalPos:
                 break
             else:
                 ResUnitCnt+=1
+                # this means you reach the end of res
+                if ResUnitCnt==len(ResSent):
+                    break
                 CurResPos=ResSent[ResUnitCnt].startpos
             #if len(ResSent)>ResUnitCnt+1:
             #    CurEl=ResSent[ResUnitCnt]
