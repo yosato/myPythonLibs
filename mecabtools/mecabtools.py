@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil
+import re, imp, os, sys, time, shutil,subprocess
 from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
 from pythonlib_ys import main as myModule
@@ -207,8 +207,8 @@ def markedsents2outputs(MkdSents,OrgFP,StrictP=True,MoveTo=None):
         print(str(ErrorCnt)+' error(s) found for file '+OrgFP)
         if not MoveTo:
             MoveTo=os.getcwd
-        shutil.copy(OrgFP,MoveTo)
-        shutil.copy(ErrorOutput,MoveTo)
+        subprocess.call(['cp',OrgFP,MoveTo])
+        subprocess.call(['cp',ErrorOutput,MoveTo])
         os.remove(OrgFP)
         os.remove(ErrorOutput)
         print('Original file moved to '+MoveTo)

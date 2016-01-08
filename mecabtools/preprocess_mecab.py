@@ -4,21 +4,27 @@ imp.reload(mecabtools)
 
 def main0(FP,CleanDir,NotCleanDir,OrgTestFP):
     # remove unwanted stuff and normalise
+    print('first we normalise the file')
     CleanFP=CleanDir+'/'+os.path.basename(FP)
     ReducedFP='.'.join(CleanFP.split('.')[:-1])+'.reduced.mecab'
     Cmd=' '.join([CleanDir+'/clean_mecab.sh',FP,'>',CleanFP])
     Proc=subprocess.Popen(Cmd,shell=True)
     Return=Proc.wait()
     if Return !=0:
-        sys.exit('clean script failed')
-    # clean mecab
+        sys.exit('clean shellscript failed')
+    else:
+        print('normalisation done')
+    # clean mecab file
+    print('now doing cleaning')
     MkdSents=mecabtools.mark_sents(CleanFP,[7,9])
     ErrorFreeP=mecabtools.markedsents2outputs(MkdSents,CleanFP,StrictP=True,MoveTo=NotCleanDir)
     # splitting
+    print('finally doing splitting')
     if ErrorFreeP:
         mecabtools.produce_traintest(CleanFP,(80,5,True),CheckAgainst=OrgTestFP)
     else:
         mecabtools.produce_traintest(ReducedFP,(80,5,True),CheckAgainst=OrgTestFP)
+    print('all done')
 
 def main():
     '''
@@ -33,6 +39,7 @@ def main():
 
     HomeDir=os.getenv('HOME')
     RtDir=os.path.join(HomeDir,'mecabKansaiModels')
+    #RtDir='/mecabKansaiModels'
     DataDir=os.path.join(RtDir,'data')
     TestDir=os.path.join(RtDir,'testfiles')
                         
