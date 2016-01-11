@@ -59,6 +59,7 @@ def already_in_anothersentlist_p(TestSent,Sents):
 
     return False
 
+
 def produce_traintest(OrgFP,TestSpec,CheckAgainst=None):
     (WhereFrom,TestNum,PercentP)=TestSpec
     SentCnt=count_sentences(OrgFP)
@@ -216,14 +217,29 @@ def markedsents2outputs(MkdSents,OrgFP,StrictP=True,MoveTo=None):
         return False
             
     
-def remove_badsents(FP,FtCnts):
+def remove_badsents(FP,FtCnts,RemoveAgainst=None):
+    if RemoveAgainst:
+        SentsToRemove=open(RemoveAgainst,'rt').read().strip().split('\n')
     MkdSents=mark_sents(FP,FtCnts)
-    for MkdSent in MkdSents:
-        if any(not MkdLine[1] for MkdLine in MkdSent):
-            pass
-        else:
-            MkdLines='\n'.join([MkdLine[0] for MkdLine in MkdSent])
-            sys.stdout.write(MkdLines+'\nEOS\n')
+    BadCnts=0
+    with open(FP+'.reduced','wt') as FSw:
+        for MkdSent in MkdSents:
+            if any(not MkdLine[1] for MkdLine in MkdSent):
+                print('problem!')
+                BadCnts+=1
+            else:
+                if RemoveAgainst:
+                    OrgSent=''.join([MkdLine[0].split('\t')[0] for MkdLine in MkdSent])
+#                    print(OrgSent)
+                    if already_in_anothersentlist_p(OrgSent,SentsToRemove):
+                        print('test sentence found!')
+                        BadCnts+=1
+                        continue
+                MkdLines='\n'.join([MkdLine[0] for MkdLine in MkdSent])
+                ToWrite=MkdLines+'\nEOS\n'
+                #sys.stdout.write(ToWrite)
+                FSw.write(ToWrite)
+        print(str(BadCnts)+' bad sentences found')
 
 def something_wrong_insideline(Line,FtCnts):
     if Line.strip()=='':
