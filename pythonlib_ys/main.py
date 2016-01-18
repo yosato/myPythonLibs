@@ -346,7 +346,7 @@ def dic_jsonable2halfjsonable(Dic):
 def list_halfjsonable2jsonable(L):
     NewL=[]
     for El in L:
-        Type=type(Value).__name__
+        Type=type(El).__name__
         if Type=='list' or Type=='dict':
             NewL.append(diclist_halfjsonable2jsonable(El))
         elif Type=='tuple':
@@ -359,7 +359,7 @@ def list_halfjsonable2jsonable(L):
 def list_jsonable2halfjsonable(L):
     NewL=[]
     for El in L:
-        Type=type(Value).__name__
+        Type=type(El).__name__
         if Type=='list' or Type=='dict':
             NewL.append(diclist_jsonable2halfjsonable(El))
         elif Type=='tuple':
@@ -398,7 +398,7 @@ def destringify_halfjsonablecollection(StringifiedTuple):
         return tuple(Els)
 
 
-
+'''
 def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
     import json
     Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
@@ -416,6 +416,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
             ToJson=jsonify_diclist(Response)
         open(FP,'wt').write(json.dumps(ToJson))
         return Response,True
+'''
 
 def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
     if type(FPs).__name__=='str':
@@ -1883,7 +1884,7 @@ def jsonify_list(L):
 def dejsonify_list(L):
     NewL=[]
     for El in L:
-        Type=type(Value).__name__
+        Type=type(El).__name__
         if Type=='list' or Type=='dict':
             NewL.append(dejsonify_diclist(El))
         elif Type=='tuple':
