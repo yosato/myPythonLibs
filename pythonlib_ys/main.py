@@ -9,6 +9,17 @@ from pdb import set_trace
 #answer = input(prompt)
 #t.cancel()
 
+
+def str2hexes(Str):
+    return [hex(ord(Chr)) for Chr in list(Str)]
+
+def hexes2str(Hexes):
+    return ''.join([chr(int(Hex,16)) for Hex in Hexes])
+    
+
+
+
+
 def sort_jsons_fromfile(InFP,OutFP=None):
     import ijson
     
