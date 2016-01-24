@@ -2,6 +2,8 @@ import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,in
 
 from pdb import set_trace
 
+from stringproc import *
+
 #timeout = 10
 #t = Timer(timeout, print, ['Sorry, times up'])
 #t.start()
@@ -9,65 +11,10 @@ from pdb import set_trace
 #answer = input(prompt)
 #t.cancel()
 
-def remove_bad_strings_fromfile(FP,StrongBans,WeakBans,StrongBanRanges=None,WeakBanRanges=None,SpecificColumn=None):
-    with open(FP+'.badremoved','wt') as FSw:
-        for Cntr,LiNe in enumerate(open(FP)):
-            if Cntr%10000==0:   print(Cntr)
-            Line=(LiNe.strip().split('\t')[SpecificColumn] if SpecificColumn else LiNe.strip())
-            if string_bad_p(Line,StrongBans,WeakBans,StrongBanRanges=StrongBanRanges,WeakBanRanges=WeakBanRanges,MaxLength=20):
-                continue
-            else:
-                FSw.write(LiNe)
-            
 
-def string_bad_p(Str,StrongBans,WeakBans,StrongBanRanges=[(0,float('inf'))],WeakBanRanges=[(0,float('inf'))],MaxLength=2000):
-    '''
-    given two sets, strongly prohibited chars and weakly prohibited chars,
-    check, for a str, if it is bad, in the sense that:
-    it contains a strongly prohibited char (even one) or
-    it consists wholly of bad weakly prohinited char
-    >>> string_bad_p('adef',['a','b'],['x','y','z'])
-    True
-    >>> string_bad_p('xyzf',['a','b'],['x','y','z'])
-    False
-    >>> string_bad_p('xyyz',['a','b'],['x','y','z'])
-    True
-    >>> string_bad_p('def',['a','b'],['x','y','z'])
-    False
-    '''
-    if len(Str)>MaxLength:
-        return True
-    WkCnt=0
-    for Cntr,Char in enumerate(Str):
-        CodeP=ord(Char)
-        if Char in StrongBans or in_ranges(CodeP,StrongBanRanges):
-            return True
-        elif Char in WeakBans or in_ranges(CodeP,WeakBanRanges):
-            if WkCnt<Cntr:
-            #this means there has been at least one legitimate char
-                return True
-            else:
-                WkCnt+=1
-    if Cntr==WkCnt-1:
-     # meaning everything was a weekly banned char 
-        return True
-    return False
+def replace_nth_substr_regex(Str,Nth,OrgRegex,NewRegex):
+    return re.sub(r'^((.*?\s.*?){Nth})'%OrgRegex,NewRegex,Str)
 
-
-
-def str2hexes(Str):
-    return [hex(ord(Chr)) for Chr in list(Str)]
-
-def hexes2str(Hexes):
-    return ''.join([chr(int(Hex,16)) for Hex in Hexes])
-    
-
-
-
-
-def sort_jsons_fromfile(InFP,OutFP=None):
-    import ijson
-    
 
 def generate_line_reverse(fp, buf_size=8192):
     """a generator that returns a line of a file in reverse order"""
@@ -1769,6 +1716,31 @@ def render_katakana(Wd):
         else:
             sys.exit('disallowed char')
     return Str
+
+HankakuRange=('0x20','0x7e')
+ZenkakuRange=('0xff00','0xff5e')
+HankakuRangeInDec=tuple([ int(Pos,16) for Pos in HankakuRange])
+ZenkakuRangeInDec=tuple([ int(Pos,16) for Pos in ZenkakuRange])
+
+def in_range(Tgt,Tuple):
+    Lower,Upper=Tuple
+    return (Tgt>=Lower and Tgt<=Upper)
+
+def first_zenkaku_ind(Str):
+    for Ind,Char in enumerate(Str):
+        if in_range(ord(Char),ZenkakuRangeInDec):
+            return Ind
+    return -1
+ 
+
+def zenkaku_hankaku(Char):
+    Distance=65248
+
+    if in_range(ord(Char),ZenkakuRangeInDec):
+        return chr(ord(Char)-Distance)
+    else:
+        print('not normalisable')
+        return None
 
 def is_kana(Char):
     CharT=identify_type_char(Char)
