@@ -1,7 +1,7 @@
 import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil
 
 from pdb import set_trace
-
+sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 from stringproc import *
 
 #timeout = 10
@@ -1880,7 +1880,10 @@ def dejsonify_dic(Dic):
     NewItems=[]
     for Key,Value in Dic.items():
         if Key.startswith('tuple|:|'):
-            NewKey=destringify_halfjsonable(Key)
+            try:
+                NewKey=destringify_halfjsonable(Key)
+            except:
+                NewKey=destringify_halfjsonable(Key)
         else:
             NewKey=Key
         Type=type(Value).__name__
@@ -1959,7 +1962,10 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
     Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
     if Response is False:
         PureJson=json.loads(open(FP,'rt').read())
-        Json=dejsonify_diclist(PureJson)
+        try:
+            Json=dejsonify_diclist(PureJson)
+        except:
+            Json=dejsonify_diclist(PureJson)
         return Json
     else:
         (Bool,DirectP)=jsonable_p(Response)
