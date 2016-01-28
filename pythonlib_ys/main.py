@@ -1890,7 +1890,12 @@ def dejsonify_dic(Dic):
         if Type=='list' or Type=='dict':
             NewVal=dejsonify_diclist(Value)
         elif Type=='str' and (Value.startswith('tuple|:|') or Value.startswith('set|:|')):
-            NewVal=destringify_halfjsonable(Value)
+            try:
+                NewVal=destringify_halfjsonable(Value)
+            except:
+                print('dejsonification for tuple failed: '+Value)
+                time.sleep(3)
+                continue
         else:
             NewVal=Value
         NewItems.append((NewKey,NewVal,))
@@ -1962,10 +1967,8 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
     Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
     if Response is False:
         PureJson=json.loads(open(FP,'rt').read())
-        try:
-            Json=dejsonify_diclist(PureJson)
-        except:
-            Json=dejsonify_diclist(PureJson)
+        Json=dejsonify_diclist(PureJson)
+        
         return Json
     else:
         (Bool,DirectP)=jsonable_p(Response)
