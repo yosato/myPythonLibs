@@ -11,6 +11,44 @@ from stringproc import *
 #answer = input(prompt)
 #t.cancel()
 
+def list_head_or_tail_included_p(LSmaller,LLarger):
+    if len(LSmaller)>len(LLarger):
+        print('the first list needs to be smaller than the second')
+        return None
+    else:
+        return (list_head_included_p(LSmaller,LLarger) or list_tail_included_p(LSmaller,LLarger))
+
+def list_head_included_p(LSmaller,LLarger):
+    '''
+    >>> list_head_included_p([1],[1,2,3,4,5])
+    True
+    >>> list_head_included_p([1,2,3],[1,2,3,4,5])
+    True
+    >>> list_head_included_p([1,3,2],[1,2,3,4,5])
+    False
+    >>> list_head_included_p([1,3,5],[1,2,3,4,5])
+    False
+    >>> list_head_included_p([0,5],[1,2,3,4,5])
+    False
+    >>> list_head_included_p([4,5],[1,2,3,4,5])
+    False
+    '''
+    return all(SEl==LEl for (SEl,LEl) in zip(LSmaller,LLarger))
+
+def list_tail_included_p(LSmaller,LLarger):
+    '''
+    >>> list_tail_included_p([5],[1,2,3,4,5])
+    True
+    >>> list_tail_included_p([3,4,5],[1,2,3,4,5])
+    True
+    >>> list_tail_included_p([3,5,4],[1,2,3,4,5])
+    False
+    >>> list_tail_included_p([3,4],[1,2,3,4,5])
+    False
+    >>> list_tail_included_p([0,5],[1,2,3,4,5])
+    False
+    '''
+    return all(SEl==LEl for (SEl,LEl) in zip(LSmaller[::-1],LLarger[::-1]))
 
 def replace_nth_substr_regex(Str,Nth,OrgRegex,NewRegex):
     return re.sub(r'^((.*?\s.*?){Nth})'%OrgRegex,NewRegex,Str)
@@ -2051,3 +2089,6 @@ def get_linecount(FP):
     return Cnt
 
 
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
