@@ -108,6 +108,38 @@ class BoardFsVs:
         self.feats_vals=ValidFsVsLangs
 
         
+def collect_trigrams_from3gramtxt(TGTxtFP):
+    ReachedEndIndex=ReachedStart3gram=False
+    IndWdDict={}
+    TGs={}
+    with open(TGTxtFP) as FSr:
+        while True:
+            Line=FSr.readline().strip()
+            if not Line:
+                continue
+            if not ReachedEndIndex:
+                LineEls=Line.split('\t')
+                if Line.startswith('-- order 1:'):
+                    ReachedEndIndex=True
+                    continue
+                elif len(LineEls)!=2:
+                    print('initial lines, or perhaps something wrong '+Line)
+                    continue
+                else:
+                    IndWdDict[LineEls[0]]=LineEls[1]
+                    
 
-            
+                    continue
+            if not ReachedStart3gram:
+                if Line.startswith('-- order 3:'):
+                    ReachedStart3gram=True
+                    continue
+            else:
+                LineEls=Line.strip().split('\t')
+                if len(LineEls)!=4:
+                    print('something wrong...')
+                else:
+                    Wd1Ind,Wd2Ind,Wd3Ind,CP=LineEls
+                    TGs[(IndWdDict[Wd1Ind],IndWdDict[Wd2Ind],IndWdDict[Wd3Ind],)]=CP
+    return TGs
 
