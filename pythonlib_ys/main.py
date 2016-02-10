@@ -585,7 +585,7 @@ def progress_counter(Milestones,ProgressConsts,Current,Unit='',Interval=2):
     elif Milestones:
         if Progress>Milestones[0]:
             print(return_stack())
-            print(str(Current)+' out of '+str(Target)+' '+Unit+' or '+str(Milestones[0])+'% done. Time taken so far: '+str((TimeNow-StartTime).seconds//60)+' mins')
+            print('['+str(TimeNow)+']'+str(Current)+' out of '+str(Target)+' '+Unit+' or '+str(Milestones[0])+'% done. Time taken so far: '+str((TimeNow-StartTime).seconds//60)+' mins')
 
             Milestones=Milestones[1:]
             time.sleep(Interval)
