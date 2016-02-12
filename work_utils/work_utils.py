@@ -107,11 +107,10 @@ class BoardFsVs:
             ValidFsVsLangs[Lang]=ValFsVs
         self.feats_vals=ValidFsVsLangs
 
-        
-def collect_trigrams_from3gramtxt(TGTxtFP):
-    ReachedEndIndex=ReachedStart3gram=False
-    IndWdDict={}
-    TGs={}
+
+def make_indwdprobdict(TGTxtFP):
+    ReachedEndIndex=ReachedEndUG=False
+    IndWdProbDict={}
     with open(TGTxtFP) as FSr:
         while True:
             Line=FSr.readline().strip()
@@ -121,25 +120,39 @@ def collect_trigrams_from3gramtxt(TGTxtFP):
                 LineEls=Line.split('\t')
                 if Line.startswith('-- order 1:'):
                     ReachedEndIndex=True
-                    continue
-                elif len(LineEls)!=2:
+                elif len(LineEls)!=2 or not LineEls[0].isdigit():
                     print('initial lines, or perhaps something wrong '+Line)
-                    continue
                 else:
-                    IndWdDict[LineEls[0]]=LineEls[1]
-                    
-
+                    IndWdProbDict[LineEls[0]]=LineEls[1]
+                continue
+            if not ReachedEndUG:
+                LineEls=Line.split('\t')
+                if Line.startswith('-- order 2:'):
+                    ReachedEndUG=True
+                else:
+                    (Ind,MP)=LineEls
+                    IndWdProbDict[Ind]=(IndWdProbDict[Ind],MP)
                     continue
-            if not ReachedStart3gram:
-                if Line.startswith('-- order 3:'):
-                    ReachedStart3gram=True
-                    continue
+    return IndWdProbDict
+        
+def collect_ngrams_from3gramtxt(TGTxtFP,IndWdProbDict,N):
+    ReachedStartNG=False
+    Stuff=[]
+    for LiNe in open(TGTxtFP):
+        Line=LiNe.strip()
+        if not ReachedStartNG:
+            if Line.startswith('-- order '+str(N)+':'):
+                ReachedStartNG=True
+                continue
             else:
-                LineEls=Line.strip().split('\t')
-                if len(LineEls)!=4:
-                    print('something wrong...')
+                LineEls=Line.split('\t')
+                if any(not LineEl.isdigit() for LineEl in LineEls):
+                    print('something wrong or some format line: '+Line)
                 else:
-                    Wd1Ind,Wd2Ind,Wd3Ind,CP=LineEls
-                    TGs[(IndWdDict[Wd1Ind],IndWdDict[Wd2Ind],IndWdDict[Wd3Ind],)]=CP
-    return TGs
-
+                    CP=float(LineEls[-2])
+                    PostWd=IndWdProbDict[LineEls[0]]
+                    WdInds=LineEls[1:N]
+                    PriorWds=tuple([IndWdProbDict[WdInd] for WdInd in WdInds])
+                    Stuff.append(PriorWds,PostWd,CP)
+                    #yield (PriorWds,PostWd,CP)
+                

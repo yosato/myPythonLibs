@@ -13,8 +13,10 @@ class TestWorkUtils(unittest.TestCase):
         LangSuffix=os.path.join(Lang,'lingo_'+Lang,'sources',Lang)
         DialectDirN='arabic_twitteronly'
         TGFN=Lang+'-lk-text.lex.3gram.txt'
-        self.TGFP=os.path.join(TGRootDir,DialectDirN,LangSuffix,TGFN)
-    def test_collect_surround_3grams(self):
+        #self.TGFP=os.path.join(TGRootDir,DialectDirN,LangSuffix,TGFN)
+        self.TGFP=os.path.join(HomeDir,TGFN)
+        
+    def test_collect_trigrams_from3gramtxt(self):
         set_trace()
         if not os.path.isfile(self.TGFP):
             sys.exit('file does not exist')
