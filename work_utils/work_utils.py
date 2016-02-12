@@ -1,4 +1,8 @@
-import os,subprocess,re,collections
+import os,subprocess,re,collections,sys
+
+sys.path.append(os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs'))
+
+from pythonlib_ys import main as myModule
 
 class LMBEExp:
     def __init__(self,ExpDirRt,Lang,ExpName,CorporaDirRt,BoardFP=None,LogFP=''):
@@ -108,12 +112,17 @@ class BoardFsVs:
         self.feats_vals=ValidFsVsLangs
 
 
-def make_indwdprobdict(TGTxtFP):
+def make_indwdprobdict_from3gramtxt(TGTxtFP):
     ReachedEndIndex=ReachedEndUG=False
-    IndWdProbDict={}
+    IndWdProbDict0={};IndWdProbDict={}
+    Consts=myModule.prepare_progressconsts(TGTxtFP)
+    MSs=None;Cntr=0
     with open(TGTxtFP) as FSr:
         while True:
-            Line=FSr.readline().strip()
+            Cntr+=1
+            MSs=myModule.progress_counter(MSs,Consts,Cntr)
+            LiNe=FSr.readline()
+            Line=LiNe.strip()
             if not Line:
                 continue
             if not ReachedEndIndex:
@@ -123,36 +132,45 @@ def make_indwdprobdict(TGTxtFP):
                 elif len(LineEls)!=2 or not LineEls[0].isdigit():
                     print('initial lines, or perhaps something wrong '+Line)
                 else:
-                    IndWdProbDict[LineEls[0]]=LineEls[1]
+                    IndWdProbDict0[LineEls[0]]=LineEls[1]
                 continue
             if not ReachedEndUG:
                 LineEls=Line.split('\t')
                 if Line.startswith('-- order 2:'):
                     ReachedEndUG=True
                 else:
-                    (Ind,MP)=LineEls
-                    IndWdProbDict[Ind]=(IndWdProbDict[Ind],MP)
+                    (Ind,MPStr,_)=LineEls
+                    IndWdProbDict[Ind]=(IndWdProbDict0[Ind],float(MPStr))
                     continue
+            if Line.startswith('-- order 3:') or not LiNe:
+                break
     return IndWdProbDict
         
-def collect_ngrams_from3gramtxt(TGTxtFP,IndWdProbDict,N):
-    ReachedStartNG=False
-    Stuff=[]
+def collect_bigrams_from3gramtxt(TGTxtFP,IndWdProbDict):
+    ReachedStartBG=False
+    #Stuff=[]
     for LiNe in open(TGTxtFP):
         Line=LiNe.strip()
-        if not ReachedStartNG:
-            if Line.startswith('-- order '+str(N)+':'):
-                ReachedStartNG=True
+        if not ReachedStartBG:
+            if Line.startswith('-- order 2:'):
+                ReachedStartBG=True
                 continue
+        else:
+            LineEls=Line.split('\t')
+            if any(not LineEl.isdigit() for LineEl in LineEls[:2]):
+                print('something wrong or some format line: '+Line)
             else:
-                LineEls=Line.split('\t')
-                if any(not LineEl.isdigit() for LineEl in LineEls):
-                    print('something wrong or some format line: '+Line)
-                else:
-                    CP=float(LineEls[-2])
-                    PostWd=IndWdProbDict[LineEls[0]]
-                    WdInds=LineEls[1:N]
-                    PriorWds=tuple([IndWdProbDict[WdInd] for WdInd in WdInds])
-                    Stuff.append(PriorWds,PostWd,CP)
-                    #yield (PriorWds,PostWd,CP)
+                CP=float(LineEls[-2])
+                PostWd=IndWdProbDict[LineEls[1]][0]
+                PriorWd,PriorProb=IndWdProbDict[LineEls[0]]
+                JP=PriorProb*CP
+                #Stuff.append((PriorWd,PostWd,CP,JP))
+                yield (PriorWd,PostWd,CP,JP)
+
+def collect_trigrams_from3gramtxt(TGTxtFP):
+    IndWdProbDict=make_indwdprobdict_from3gramtxt(TGTxtFP)
+    BGs=collect_bigrams_from3gramtxt(TGTxtFP,IndWdProbDict)
+    for (PriorWd,PostWd,CP,JP) in BGs:
+        
+        
                 

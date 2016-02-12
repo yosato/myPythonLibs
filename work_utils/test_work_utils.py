@@ -15,12 +15,12 @@ class TestWorkUtils(unittest.TestCase):
         TGFN=Lang+'-lk-text.lex.3gram.txt'
         #self.TGFP=os.path.join(TGRootDir,DialectDirN,LangSuffix,TGFN)
         self.TGFP=os.path.join(HomeDir,TGFN)
-        
-    def test_collect_trigrams_from3gramtxt(self):
-        set_trace()
         if not os.path.isfile(self.TGFP):
             sys.exit('file does not exist')
-        work_utils.collect_trigrams_from3gramtxt(self.TGFP)
+        
+    def test_collect_bigrams_from3gramtxt(self):
+        set_trace()
+        work_utils.collect_bigrams_from3gramtxt(self.TGFP)
 
 if __name__=='__main__':
     unittest.main()
