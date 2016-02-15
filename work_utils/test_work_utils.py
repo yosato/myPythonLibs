@@ -20,7 +20,9 @@ class TestWorkUtils(unittest.TestCase):
         
     def test_collect_bigrams_from3gramtxt(self):
         set_trace()
-        work_utils.collect_bigrams_from3gramtxt(self.TGFP)
+        TGs=work_utils.collect_trigrams_from3gramtxt(self.TGFP)
+        for TG in TGs:
+            print(TG)
 
 if __name__=='__main__':
     unittest.main()
