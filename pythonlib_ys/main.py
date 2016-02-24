@@ -577,7 +577,7 @@ def progress_counter(Milestones,ProgressConsts,Current,Unit='',Interval=2):
             MilestoneUnits=5
         Milestones=create_percentage_milestones(MilestoneUnits)
         
-        print('Rough estimate of total duration '+'{0:.2f}'.format(DurEstimate)+' mins. You will be alerted again at '+str(Milestones[1])+'%')
+        print('Rough estimate of total duration '+'{0:.2f}'.format(DurEstimate)+' mins ('+str(DurEstimate//60)+'). You will be alerted again at '+str(Milestones[1])+'%')
         if DurEstimate>30:
             print('Have a cup of tea...')
         time.sleep(Interval)
