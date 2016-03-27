@@ -11,6 +11,68 @@ from stringproc import *
 #answer = input(prompt)
 #t.cancel()
 
+def encode_json_write(LofStuff,OutFP):
+    with open(OutFP,'wt') as FSw:
+        for Item in LofStuff:
+            FSw.write(json.dumps(Item.__dict__)+'\n')
+
+def encode_json_write_fs(FSr,OutFSw):
+    while True:
+        Item=FSr.readline()
+        if not Item:
+            break
+        else:
+            OutFSw.write(Item)
+
+def mergesort_twojsonfiles(JFP1,JFP2,Criterion,OutFP=None,L2S=True):
+    SortedList=[]
+    FSr1=open(JFP1,'rt')
+    FSr2=open(JFP2,'rt')
+
+    if not OutFP:
+        OutFP=JFP1+JFP2
+    FSw=open(OutFP,'wt')
+
+    TopEl1R=FSr1.readline()
+    TopEl1=json.loads(TopEl1R)
+    TopEl2R=FSr2.readline()
+    TopEl2=json.loads(TopEl2R)
+
+    while True:
+        if TopEl1[Criterion]>TopEl2[Criterion]:
+            (FSrToTake,FSrOther)=((FSr1,FSr2) if L2S else (FSr2,FSr1))
+            SortedList.append(TopEl1)
+            FSw.write(TopEl1R)
+            TopEl1R=FSrToTake.readline()
+            if TopEl1R:
+                TopEl1=json.loads(TopEl1R)
+            else:
+                encode_json_write_fs(FSrOther,FSw)
+                break
+        else:
+            (FSrToTake,FSrOther)=((FSr2,FSr1) if L2S else (FSr1,FSr2))
+            SortedList.append(TopEl2)
+            FSw.write(TopEl2R)
+            TopEl2R=FSrToTake.readline()
+            if TopEl2R:
+                TopEl2=json.loads(TopEl2R)
+            else:
+                encode_json_write_fs(FSrOther,FSw)
+                break
+    FSr1.close()
+    FSr2.close()
+    FSw.close()
+
+    return SortedList
+
+
+
+
+
+
+
+
+
 def list_head_or_tail_included_p(LSmaller,LLarger):
     if len(LSmaller)>len(LLarger):
         print('the first list needs to be smaller than the second')
@@ -1813,27 +1875,34 @@ def kana2kana(Char):
 ## fileproc
 ##
 
-def dedup_totalidenticals(FPIn,FPOut=None,Min=80,WindowSize=5000):
+def dedup_totalidenticals(FPIn,FPOut=None,Min=80,WindowSize=5000,LineNumsOnly=False):
     if not FPOut:
-        FPOut=FPIn+'.dedup'
+        FSOut=sys.stout
+    else:
+        FSOut=open(FPOut,'wt') 
     Seen=[]; Sentl=False
+    DupLineNums=set();Cntr=0
     with open(FPIn) as FSr:
-        with open(FPOut,'wt') as FSw:
-            while not Sentl:
-                LiNe=FSr.readline()
-                if not LiNe:
-                    Sentl=True
-                    continue
-                Line=LiNe.strip()
-                if Line and len(Line)>Min and Line in Seen:
-                    print('dup found, "'+Line+'" at earlier by '+str(WindowSize-Seen.index(Line)))
-                    
-                else:
-                    if Line:
-                        Seen.append(Line)
-                    if len(Seen)>WindowSize:
-                        Seen.pop(0)
-                    FSw.write(LiNe)
+        Cntr+=1
+        while not Sentl:
+            LiNe=FSr.readline()
+            if not LiNe:
+                Sentl=True
+                continue
+            Line=LiNe.strip()
+            if Line and len(Line)>Min and Line in Seen:
+                print('dup found, "'+Line+'" at earlier by '+str(WindowSize-Seen.index(Line)))
+                DupLineNums.add(Cntr)
+            else:
+                if Line:
+                    Seen.append(Line)
+                if len(Seen)>WindowSize:
+                    Seen.pop(0)
+                if not LineNumsOnly:
+                    FSOut.write(LiNe)
+    if not FPOut:
+        FSOut.close()
+    return DupLineNums
 
 
 class JsonManip:

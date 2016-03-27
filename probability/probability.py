@@ -1,4 +1,4 @@
-import imp,sys,math,copy,collections,fractions,pdb
+import imp,sys,math,copy,collections,fractions,pdb,decimal
 from collections import defaultdict
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
@@ -8,6 +8,9 @@ if Debug:
     from pdb import set_trace
 
 __author__ = 'yosato'
+
+def floating_point(Float):
+    return abs(decimal.Decimal(str(Float)).as_tuple().exponent)
 
 class EquivalEqual:
     def __init__(self):
@@ -27,16 +30,28 @@ class DiscDist(EquivalEqual):
     '''
     def __init__(self,EvtProbPairsOrEvtOccPairs,Occs={},TotalOccs=0):
         super().__init__()
-        if not EvtProbPairsOrEvtOccPairs or type(list(EvtProbPairsOrEvtOccPairs.values())[0]).__name__=='int':
-            self.evtocc=EvtProbPairsOrEvtOccPairs
-            self.occs=[ Occ for Occ in self.evtocc.values() ]
-            self.totalocc=sum(self.occs)
-            self.evtcount=len(EvtProbPairsOrEvtOccPairs.keys())
-            EvtProbPairs=self.evtocc2evtprob()
-        else:
+        Samples=EvtProbPairsOrEvtOccPairs.values()
+        if all(Sample <= 1 for Sample in Samples):
             EvtProbPairs=EvtProbPairsOrEvtOccPairs
             self.evtocc=Occs
             self.totalocc=TotalOccs
+            if not self.sum_check():
+                sys.exit('probability does not sum to one')
+        else:
+            if any(isinstance(Sample,float) for Sample in Samples):
+                self.occadjusted=True
+            else:
+                self.occadjusted=False
+            
+            self.evtocc=EvtProbPairsOrEvtOccPairs
+            self.occs=[ Occ for Occ in self.evtocc.values() ]
+            self.totalocc=sum(self.occs)
+            
+            self.evtcount=len(EvtProbPairsOrEvtOccPairs.keys())
+            EvtProbPairs=self.evtocc2evtprob()
+
+            
+
         self.evtprob=EvtProbPairs
         self.probs=[ Probs for Probs in self.evtprob.values() ]
       #  self.sum_check()
@@ -50,7 +65,26 @@ class DiscDist(EquivalEqual):
         return { Evt:Occ  for (Evt,Occ) in Items if Occ>Thresh }
             
     def evtocc2evtprob(self):
-        return { Evt:fractions.Fraction(Occ,self.totalocc) for Evt,Occ in self.evtocc.items() }
+        if self.occadjusted:
+            TotalOccFloatP=floating_point(self.totalocc)
+            EvtProb={}
+            for Evt,Occ in self.evtocc.items():
+                FloatP=floating_point(Occ)
+                if TotalOccFloatP < FloatP:
+                    Coeff=math.pow(10,TotalOccFloatP)
+                    IntOcc=int(Coeff*round(Occ,TotalOccFloatP))
+                    IntTotalOcc=int(Coeff*self.totalocc)
+                    
+                else:
+                    # you should here adjust to the event occ
+                    Coeff=math.pow(10,FloatP)
+                    IntTotalOcc=round(self.totalocc,FloatP)*Coeff
+                    IntOcc=Coeff*Occ
+                Prob=fractions.Fraction(IntOcc,IntTotalOcc)
+                EvtProb[Evt]=Prob
+            return EvtProb
+        else:    
+            return { Evt:fractions.Fraction(Occ,self.totalocc) for Evt,Occ in self.evtocc.items() }
         
     def format_check(self,EvtProbPairs):
         Bool=True
