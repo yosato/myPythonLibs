@@ -78,8 +78,8 @@ class DiscDist(EquivalEqual):
                 else:
                     # you should here adjust to the event occ
                     Coeff=math.pow(10,FloatP)
-                    IntTotalOcc=round(self.totalocc,FloatP)*Coeff
-                    IntOcc=Coeff*Occ
+                    IntTotalOcc=int(round(self.totalocc,FloatP)*Coeff)
+                    IntOcc=int(Coeff*Occ)
                 Prob=fractions.Fraction(IntOcc,IntTotalOcc)
                 EvtProb[Evt]=Prob
             return EvtProb
