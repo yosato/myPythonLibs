@@ -367,10 +367,10 @@ def ask_filenoexist_execute_pickle(FP,Function,ArgsKArgs,Message='Use the old fi
             print(FP+' to be backed up with .bak extension')
             shutil.move(FP,FP+'.bak')
         dump_pickle(Response,FP)
-        return Response
+        return Response,False
     elif Response is False:
         Pickle=load_pickle(FP)
-        return Pickle
+        return Pickle,True
     else:
         sys.exit('ask_filenoexist_execute_pickle: response empty, nothing to pickle, somehing wrong')
 
@@ -1877,7 +1877,7 @@ def kana2kana(Char):
 
 def dedup_totalidenticals(FPIn,FPOut=None,Min=80,WindowSize=5000,LineNumsOnly=False):
     if not FPOut:
-        FSOut=sys.stout
+        FSOut=sys.stdout
     else:
         FSOut=open(FPOut,'wt') 
     Seen=[]; Sentl=False
@@ -1900,7 +1900,7 @@ def dedup_totalidenticals(FPIn,FPOut=None,Min=80,WindowSize=5000,LineNumsOnly=Fa
                     Seen.pop(0)
                 if not LineNumsOnly:
                     FSOut.write(LiNe)
-    if not FPOut:
+    if FPOut:
         FSOut.close()
     return DupLineNums
 

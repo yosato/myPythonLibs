@@ -31,7 +31,7 @@ class DiscDist(EquivalEqual):
     def __init__(self,EvtProbPairsOrEvtOccPairs,Occs={},TotalOccs=0):
         super().__init__()
         Samples=EvtProbPairsOrEvtOccPairs.values()
-        if all(Sample <= 1 for Sample in Samples):
+        if all(Sample < 1 for Sample in Samples):
             EvtProbPairs=EvtProbPairsOrEvtOccPairs
             self.evtocc=Occs
             self.totalocc=TotalOccs
