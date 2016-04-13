@@ -2,7 +2,7 @@ import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,in
 
 from pdb import set_trace
 sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
-from stringproc import *
+#from stringproc import *
 
 #timeout = 10
 #t = Timer(timeout, print, ['Sorry, times up'])
