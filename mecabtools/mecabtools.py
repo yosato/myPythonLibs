@@ -1,6 +1,7 @@
 import re, imp, os, sys, time, shutil,subprocess
 from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
+from collections import defaultdict
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 try:
@@ -12,6 +13,14 @@ except:
 
 Debug=0
 
+def extract_samefeat_lines(FP,Colnums):
+    ContentsLinums=defaultdict(list)
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            FtEls=LiNe.strip().split(',')
+            RelvEls=tuple([ FtEls(Ind-1) for Ind in range(Colnums) ])
+            ContentsLinums[RelvEls]+=Cntr+1
+    
 def count_sentences(FP):
     Cntr=0
     for LiNe in open(FP):
