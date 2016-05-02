@@ -13,13 +13,30 @@ except:
 
 Debug=0
 
+def pick_lines(FP,OrderedLineNums):
+    with open(FP) as FSw:
+        for Cntr,LiNe in enumerate(FSw):
+            if OrderedLineNums and Cntr+1 == OrderedLineNums[0]:
+                OrderedLineNums.pop(0)
+                sys.stdout.write(LiNe)
+
 def extract_samefeat_lines(FP,Colnums):
     ContentsLinums=defaultdict(list)
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             FtEls=LiNe.strip().split(',')
-            RelvEls=tuple([ FtEls(Ind-1) for Ind in range(Colnums) ])
-            ContentsLinums[RelvEls]+=Cntr+1
+            RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
+            ContentsLinums[RelvEls].append(Cntr+1)
+    ContentsLinums={ Fts:Lines for (Fts,Lines) in ContentsLinums.items() if len(Lines)>=2 }
+    #ContentsLinums=sorted(ContentsLinums.items(),key=lambda x:len(x[1]),reverse=True)
+    
+    for Lines in ContentsLinums.values():
+        pick_lines(FP,Lines)
+        print()
+        
+    return ContentsLinums
+
+extract_samefeat_lines('/Users/yosato/seed.old/allpos.csv',[5,6,7,8,9,10,13])
     
 def count_sentences(FP):
     Cntr=0
