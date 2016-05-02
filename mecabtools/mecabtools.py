@@ -21,22 +21,80 @@ def pick_lines(FP,OrderedLineNums):
                 sys.stdout.write(LiNe)
 
 def extract_samefeat_lines(FP,Colnums):
+    SeenInf=set()
     ContentsLinums=defaultdict(list)
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             FtEls=LiNe.strip().split(',')
             RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
-            ContentsLinums[RelvEls].append(Cntr+1)
+            InfEls=tuple([ FtEls[Ind-1] for Ind in (5,6,7,8,9,11) ])
+            #print(InfEls)
+            if InfEls[0]=='動詞' or InfEls[0]=='形容詞':
+                #print(InfEls[0]+InfEls[5])
+                ContentsLinums[RelvEls].append(LiNe.strip())
+                SeenInf.add(InfEls)
     ContentsLinums={ Fts:Lines for (Fts,Lines) in ContentsLinums.items() if len(Lines)>=2 }
     #ContentsLinums=sorted(ContentsLinums.items(),key=lambda x:len(x[1]),reverse=True)
-    
-    for Lines in ContentsLinums.values():
-        pick_lines(FP,Lines)
-        print()
-        
+
+    for Content,Lines in ContentsLinums.items():
+        sys.stderr.write('candidate\n')
+        sys.stderr.write('\n'.join(Lines)+'\n')
+        Clusters=cluster_homonyms([Line.split(',')[0] for Line in Lines])
+        for Cntr,Cluster in enumerate(Clusters):
+            #RelvLines=[]
+            sys.stderr.write('\nresults'+str(Cntr+1)+'\n')
+            if len(Cluster)<=1:
+                sys.stderr.write('none\n')
+            else:
+                RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Cluster ]
+            
+                sys.stdout.write('\n'.join(RelvLines)+'\n\n')
+            
+            
+                
     return ContentsLinums
 
-extract_samefeat_lines('/Users/yosato/seed.old/allpos.csv',[5,6,7,8,9,10,13])
+def homonympair_identical_p(Homonym1,Homonym2):
+    # trivial case
+    if Homonym1==Homonym2:
+        Bool=True
+    else:
+        # default is true
+        Bool=True
+        # but don't accept kanji-only pairs as synonyms
+        if all(myModule.all_of_chartypes_p(Homonym,['han']) for Homonym in (Homonym1,Homonym2)):
+            Bool=False
+        Kanjis1={ Char for Char in Homonym1 if myModule.identify_type_char(Char)=='han'}
+        if Kanjis1:
+            Kanjis2={ Char for Char in Homonym2 if myModule.identify_type_char(Char)=='han'}
+            if Kanjis2:
+                if not Kanjis1.intersection(Kanjis2):
+                    Bool=False
+            
+    return Bool
+
+def cluster_homonyms(Homs):
+    #print(Homs)
+    #print()
+    KanaOnlys={ Hom  for Hom in Homs if myModule.all_of_chartypes_p(Hom,['hiragana','katakana']) }
+    Prv=None;Clusters=[set()]
+    for Cntr,Hom in enumerate(set(Homs)-KanaOnlys):
+        if Cntr==0:
+            Clusters[-1].add(Hom)
+        else:
+            if homonympair_identical_p(Prv,Hom):
+                Clusters[-1].add(Hom)
+            else:
+                Clusters.append({Hom})
+        Prv=Hom
+    return [ Cluster.union(KanaOnlys) for Cluster in Clusters ]
+
+
+        
+
+
+HomeDir=os.getenv('HOME')
+extract_samefeat_lines(os.path.join(HomeDir,'links/mecabKansaiModels/original/standard/model/allpos.csv'),[5,6,7,8,9,10,13])
     
 def count_sentences(FP):
     Cntr=0
