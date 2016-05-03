@@ -21,6 +21,16 @@ def pick_lines(FP,OrderedLineNums):
                 sys.stdout.write(LiNe)
 
 def extract_samefeat_lines(FP,Colnums):
+    def cluster_process(Cluster):
+        CumRelvLines=[]
+        for Group in Cluster:
+            if len(Cluster)>=2:
+                RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Cluster ]
+                #sys.stdout.write('\n'.join(RelvLines)+'\n\n')
+                CumRelvLines.extend(RelvLines)
+        return CumRelvLines
+                                   
+                
     SeenInf=set()
     ContentsLinums=defaultdict(list)
     with open(FP) as FSr:
@@ -40,19 +50,16 @@ def extract_samefeat_lines(FP,Colnums):
         sys.stderr.write('candidate\n')
         sys.stderr.write('\n'.join(Lines)+'\n')
         Clusters=cluster_homonyms([Line.split(',')[0] for Line in Lines])
-        for Cntr,ClusterPair in enumerate(Clusters):
+        for Cntr,(KanaCluster,KanjiCluster) in enumerate(Clusters):
             #RelvLines=[]
-            for KanaCluster,KanjiCluster in ClusterPair:
+            for KanjiCands in KanjiCluster:
                 sys.stderr.write('\nresults'+str(Cntr+1)+'\n')
-                cluster_process(KanjiCluster)
-                def cluster_process(Cluster):
-                    for Group in Cluster:
-                        if len(Cluster)>=2:
-                            RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Cluster ]
-            
-                        sys.stdout.write('\n'.join(RelvLines)+'\n\n')
-            if 
-            
+                RelvLines=cluster_process(KanjiCands)
+
+                if not RelvLines:
+                    RelvLines=cluster_process(KanaCluster)
+
+            sys.stdout.write('\n'.join(RelvLines)+'\n')
                 
     return ContentsLinums
 
@@ -89,7 +96,7 @@ def cluster_homonyms(Homs):
             else:
                 Clusters.append({Hom})
         Prv=Hom
-    return ([KanaOnlys],Clusters) 
+    return ([set(KanaOnlys)],Clusters)
 
 
         
