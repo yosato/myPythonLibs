@@ -1,7 +1,7 @@
 import re, imp, os, sys, time, shutil,subprocess
 from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
-from collections import defaultdict
+from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 try:
@@ -20,96 +20,20 @@ def pick_lines(FP,OrderedLineNums):
                 OrderedLineNums.pop(0)
                 sys.stdout.write(LiNe)
 
-def extract_samefeat_lines(FP,Colnums):
-    def cluster_process(Cluster,Lines):
-        CumRelvLines=[]
-        for Group in Cluster:
-            if len(Group)>=2:
-                RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Group ]
-                #sys.stdout.write('\n'.join(RelvLines)+'\n\n')
-                CumRelvLines.extend(RelvLines)
-        return CumRelvLines
-                                   
-                
-    #SeenInf=set()
-    #Linums=set()
-    ContentsLines=defaultdict(list)
+def cluster_samefeat_lines(FP,Colnums):
+    ContentsLines=OrderedDict()
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
-            FtEls=LiNe.strip().split(',')
+            Line=LiNe.strip()
+            FtEls=Line.split(',')
             RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
-            #InfEls=tuple([ FtEls[Ind-1] for Ind in (5,6,7,8,9,11) ])
-            #print(InfEls)
-#            if InfEls[0]=='動詞' or InfEls[0]=='形容詞':
-                #print(InfEls[0]+InfEls[5])
-            ContentsLines[RelvEls].append(LiNe.strip())
-            #SeenInf.add(InfEls)
-
-    for Content,Lines in ContentsLines.items():
-        if len(Lines)==1:
-            sys.stderr.write('no ambiguity\n')
-            sys.stdout.write(Lines[0]+'\n')
-        else:    
-            KanaC,KanjiC=cluster_homonyms([Line.split(',')[0] for Line in Lines])
-        #for Cntr,(KanaCluster,KanjiCluster) in enumerate(Clusters):
-
-            RelvLines=cluster_process(KanjiC,Lines)
-
-            if not RelvLines:
-                RelvLines=cluster_process(KanaC,Lines)
-
-            if not RelvLines:
-                sys.stderr.write('\nno variant orth\n')
-                sys.stdout.write('\n'.join(Lines)+'\n')
+            if RelvEls in ContentsLines.keys():
+                ContentsLines[RelvEls].append(Line)
             else:
-                sys.stderr.write('\n-- variant orths --\n')
-                #sys.stdout.write('\n'.join(RelvLines)+'\n')
-                sys.stdout.write(RelvLines[0]+'\n')
-                sys.stderr.write('-- up to here variant orths --\n')
-                
+                ContentsLines[RelvEls]=[Line]
+
     return ContentsLines
 
-def homonympair_identical_p(Homonym1,Homonym2):
-    # trivial case
-    if Homonym1==Homonym2:
-        Bool=True
-    else:
-        # default is true
-        Bool=True
-        # but don't accept kanji-only pairs as synonyms
-        if all(myModule.all_of_chartypes_p(Homonym,['han']) for Homonym in (Homonym1,Homonym2)):
-            Bool=False
-        Kanjis1={ Char for Char in Homonym1 if myModule.identify_type_char(Char)=='han'}
-        if Kanjis1:
-            Kanjis2={ Char for Char in Homonym2 if myModule.identify_type_char(Char)=='han'}
-            if Kanjis2:
-                if not Kanjis1.intersection(Kanjis2):
-                    Bool=False
-            
-    return Bool
-
-def cluster_homonyms(Homs):
-    #print(Homs)
-    #print()
-    KanaOnlys=[ Hom  for Hom in Homs if myModule.all_of_chartypes_p(Hom,['hiragana','katakana']) ]
-    Prv=None;Clusters=[set()]
-    for Cntr,Hom in enumerate(set(Homs)-set(KanaOnlys)):
-        if Cntr==0:
-            Clusters[-1].add(Hom)
-        else:
-            if homonympair_identical_p(Prv,Hom):
-                Clusters[-1].add(Hom)
-            else:
-                Clusters.append({Hom})
-        Prv=Hom
-    return ([set(KanaOnlys)],Clusters)
-
-
-        
-
-
-HomeDir=os.getenv('HOME')
-extract_samefeat_lines(os.path.join(HomeDir,'links/mecabKansaiModels/original/standard/model/allpos.csv'),[5,6,7,8,9,10,13])
     
 def count_sentences(FP):
     Cntr=0
