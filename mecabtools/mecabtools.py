@@ -21,47 +21,53 @@ def pick_lines(FP,OrderedLineNums):
                 sys.stdout.write(LiNe)
 
 def extract_samefeat_lines(FP,Colnums):
-    def cluster_process(Cluster):
+    def cluster_process(Cluster,Lines):
         CumRelvLines=[]
         for Group in Cluster:
-            if len(Cluster)>=2:
-                RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Cluster ]
+            if len(Group)>=2:
+                RelvLines=[ Line for Line in Lines if Line.split(',')[0] in Group ]
                 #sys.stdout.write('\n'.join(RelvLines)+'\n\n')
                 CumRelvLines.extend(RelvLines)
         return CumRelvLines
                                    
                 
-    SeenInf=set()
-    ContentsLinums=defaultdict(list)
+    #SeenInf=set()
+    #Linums=set()
+    ContentsLines=defaultdict(list)
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             FtEls=LiNe.strip().split(',')
             RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
-            InfEls=tuple([ FtEls[Ind-1] for Ind in (5,6,7,8,9,11) ])
+            #InfEls=tuple([ FtEls[Ind-1] for Ind in (5,6,7,8,9,11) ])
             #print(InfEls)
 #            if InfEls[0]=='動詞' or InfEls[0]=='形容詞':
                 #print(InfEls[0]+InfEls[5])
-            ContentsLinums[RelvEls].append(LiNe.strip())
-            SeenInf.add(InfEls)
-    ContentsLinums={ Fts:Lines for (Fts,Lines) in ContentsLinums.items() if len(Lines)>=2 }
-    #ContentsLinums=sorted(ContentsLinums.items(),key=lambda x:len(x[1]),reverse=True)
+            ContentsLines[RelvEls].append(LiNe.strip())
+            #SeenInf.add(InfEls)
 
-    for Content,Lines in ContentsLinums.items():
-        sys.stderr.write('candidate\n')
-        sys.stderr.write('\n'.join(Lines)+'\n')
-        Clusters=cluster_homonyms([Line.split(',')[0] for Line in Lines])
-        for Cntr,(KanaCluster,KanjiCluster) in enumerate(Clusters):
-            #RelvLines=[]
-            for KanjiCands in KanjiCluster:
-                sys.stderr.write('\nresults'+str(Cntr+1)+'\n')
-                RelvLines=cluster_process(KanjiCands)
+    for Content,Lines in ContentsLines.items():
+        if len(Lines)==1:
+            sys.stderr.write('no ambiguity\n')
+            sys.stdout.write(Lines[0]+'\n')
+        else:    
+            KanaC,KanjiC=cluster_homonyms([Line.split(',')[0] for Line in Lines])
+        #for Cntr,(KanaCluster,KanjiCluster) in enumerate(Clusters):
 
-                if not RelvLines:
-                    RelvLines=cluster_process(KanaCluster)
+            RelvLines=cluster_process(KanjiC,Lines)
 
-            sys.stdout.write('\n'.join(RelvLines)+'\n')
+            if not RelvLines:
+                RelvLines=cluster_process(KanaC,Lines)
+
+            if not RelvLines:
+                sys.stderr.write('\nno variant orth\n')
+                sys.stdout.write('\n'.join(Lines)+'\n')
+            else:
+                sys.stderr.write('\n-- variant orths --\n')
+                #sys.stdout.write('\n'.join(RelvLines)+'\n')
+                sys.stdout.write(RelvLines[0]+'\n')
+                sys.stderr.write('-- up to here variant orths --\n')
                 
-    return ContentsLinums
+    return ContentsLines
 
 def homonympair_identical_p(Homonym1,Homonym2):
     # trivial case
