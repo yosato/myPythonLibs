@@ -20,17 +20,18 @@ def pick_lines(FP,OrderedLineNums):
                 OrderedLineNums.pop(0)
                 sys.stdout.write(LiNe)
 
-def cluster_samefeat_lines(FP,Colnums):
+def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
     ContentsLines=OrderedDict()
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             Line=LiNe.strip()
             FtEls=Line.split(',')
-            RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
-            if RelvEls in ContentsLines.keys():
-                ContentsLines[RelvEls].append(Line)
-            else:
-                ContentsLines[RelvEls]=[Line]
+            if FtEls[4] not in Exclude:
+                RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
+                if RelvEls in ContentsLines.keys():
+                    ContentsLines[RelvEls].append(Line)
+                else:
+                    ContentsLines[RelvEls]=[Line]
 
     return ContentsLines
 
