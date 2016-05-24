@@ -14,6 +14,207 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
+def mecabline2avpairs(MecabLine):
+    Wd,Fts=line2wdfts()
+    if len(Fts)>=8:
+        Cat=Fts[0]
+        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7])
+    else:
+        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*')
+
+
+class MecabWdParse:
+    def __init__(self,**AVPairs):
+#Lexeme='',Feats={},Variants=[],SoundRules=[],CtxtB='',CtxtA='',Cat='*',Subcat='*',Subcat2='*',Sem='*',Lemma='*',InfPat='*',InfForm='*',Reading='*'):
+        Fts=AVPairs.keys()
+        if ('orth' in Fts and 'lexeme' in Fts) or ('orth' not in Fts and 'lexeme' not in Fts):
+            sys.exit('you must have either orth or lexeme for word (and not both)')
+        # just populating in case 
+        self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
+        self.sem='*'; self.infpat='*'; self.infform='*'
+        self.soundrules=[]; self.variants=[]
+
+        if 'lexeme' in AVPairs.keys():
+            self.initialise_features_fromlexeme(AVPairs)
+        else:
+            self.initialise_features_withoutlexeme(AVPairs)
+
+    def initialise_features_withoutlexeme(self,AVDic):
+        self.construct_lexeme(AVDic)
+        self.initialise_features(AVDic)
+
+    def initialise_features_fromlexeme(self,AVDic):
+        self.set_lexeme(AVDic['lexeme'],AVDic['infform'])
+        self.initialise_features(AVDic)
+
+    def initialise_features(self,AVDic):
+        DoSound=False
+        if 'orth' in AVDic.keys() and ('reading' not in AVDic.keys() or AVDic['reading']=='*'):
+            Orth=AVDic['orth']
+            if not myModule.textproc.all_of_chartypes_p(Orth,['katakana']) and myModule.textproc.at_least_one_of_chartypes_p(Orth,['han','hiragana']):
+                DoSound=True
+
+        self.set_features(AVDic,dosoundorth=DoSound,dosoundreading=DoSound)
+
+        if not self.orth:
+            if self.lexeme.__name__=='InfLexeme':
+                self.orth=self.lexeme.infforms[self.infform]
+            else:
+                self.orth=self.lexeme.lemma
+    def set_features(self,AVDic,dosoundorth=False,dosoundreading=False):
+        for Ft,Val in AVDic.items():
+            self.set_feature(Ft,Val,dosoundorth=dosoundorth,dosoundreading=dosoundreading)
+
+    def set_feature(self,Ft,Val,dosoundorth=False,dosoundreading=False):
+        if Ft=='reading':
+            self.set_reading(Val,dosound=dosoundreading)
+        elif Ft=='orth':
+            self.set_orth(Val,dosound=dosoundorth)
+        elif Ft=='infform' and Val=='仮定形':
+            self.infform='連用形'
+        else:
+            self.__dict__[Ft]=Val
+
+    def construct_lexeme(self,AVDic):
+        Cat=AVDic['cat'];Lemma=AVDic['lemma']
+        CommonFts=['subcat','subcat2','sem']
+        AVSubDic={}
+        if AVDic['infform']!='*':
+            for Ft in CommonFts:
+                AVSubDic[Ft]=AVDic[Ft]
+            Lexeme=InfLexeme(Cat,Lemma,{},AVDic['infpat'],**AVSubDic)
+        else:
+            for Ft in CommonFts:
+                AVSubDic[Ft]=AVDic[Ft]
+            Lexeme=NonInfLexeme(Cat,Lemma,**AVSubDic)
+#Cat,Lemma,Subcat=Subcat,Subcat2=Subcat2,Sem=Sem,SoundRules=SoundRules,Variants=Variants)
+            
+        return Lexeme
+
+    def set_lexeme(self,Lexeme,InfForm): 
+#        if Lexeme.__name__=='InfLexeme':
+#            self.orth=Lexeme.infforms[InfForm]
+#        elif Lexeme.__name__=='NonInfLexeme':
+#            self.orth=Lexeme.lemma
+
+        self.lexeme=Lexeme
+        self.transfer_feats_fromlex(InfForm)
+
+
+    def set_orth(self,Orth,dosound=False):
+        self.orth=Orth
+        if dosound:
+            if myModule.all_of_chartypes_p(Orth,['katakana']):
+                self.reading=Orth
+            elif myModule.all_of_chartypes_p(Orth,['hiragana']):
+                self.reading=myModule.kana2kana_wd(Orth)
+            elif myModule.all_of_chartypes_p(Orth,['han','hiragana','katakana']):
+                ShellCmd=' '.join([HomeDir+'/myProgs/scripts/kakasi_katakana.sh','"'+Orth+'"'])
+                self.reading=subprocess.Popen(ShellCmd,shell=True,stdout=subprocess.PIPE).communicate()[0].strip().decode()
+
+    def set_reading(self,Reading,dosound=False):
+        if not myModule.textproc.all_of_chartypes_p(Reading,['katakana']):
+            pass
+            #if not myModule.all_of_types_p(Reading,['sym','cjksym']):
+            #    print('\n'+Reading+' '+inspect.stack()[1][3]+' reading not in katakana')
+#                sys.excepthook()
+        else:
+            self.reading=Reading
+            self.pronunciation=Reading
+        if dosound:
+            self.synchronise_sound()
+
+    def change_sound(self,ChangeToWhat):
+        self.set_reading(ChangeToWhat)
+        self.synchronise_sound()
+
+    def synchronise_sound(self):
+        OrgOrth=self.orth
+        if myModule.all_of_chartypes_p(OrgOrth,['katakana']):
+            self.orth=self.reading
+        elif myModule.all_of_chartypes_p(OrgOrth,['hiragana']):
+            self.orth=myModule.kana2kana_wd(self.reading)
+        elif myModule.all_of_chartypes_p(OrgOrth,['han','hiragana']):
+            EndSubstr=''
+            Boundary=identify_kana_boundary(OrgOrth)
+            EndSubstr=myModule.kana2kana_wd(self.reading[Boundary:])
+            TopSubstr=OrgOrth[:Boundary]
+            self.orth=TopSubstr+EndSubstr
+                
+        else:
+            self.orth=self.reading
+
+    def transfer_feats_fromlex(self,InfForm):
+        if self.lexeme:
+            self.lemma=self.lexeme.lemma
+            self.cat=self.lexeme.cat
+            self.subcat=self.lexeme.subcat
+            self.subcat2=self.lexeme.subcat2
+            self.sem=self.lexeme.sem
+            self.variants=self.lexeme.variants
+            self.soundrules=self.lexeme.soundrules
+            if self.lexeme.__name__=='InfLexeme':
+                self.set_feature('infpat',self.lexeme.infpat)
+                self.set_orth(self.lexeme.infforms[InfForm],dosound=True)
+            else:
+                self.set_orth(self.lexeme.lemma,dosound=True)
+
+    def pick_applicable_variant(self):
+        for Variant,FtDic in self.variants:
+#            for Variant,FtDic in VarDic:
+                if all([ self.contextbefore.__dict__[Ft]==Val for (Ft,Val) in FtDic.items()] ):
+                   return Variant
+    def apply_soundchange(self,Deb=0):
+        if not self.soundrules:
+            if Deb:    print('no sound change rule found')
+        else:
+            NewMe=self
+            for (SoundRule,Probability) in self.soundrules:
+                if Probability>=random.randint(1,100):
+                    OldSoundB=NewMe.contextbefore.reading
+                    OldSoundC=NewMe.reading
+
+                    NewMe=SoundRule(NewMe)
+
+                    NewSoundB=NewMe.contextbefore.reading
+                    NewSoundC=NewMe.reading
+                    ChangedPairs=[]
+                    if OldSoundB!=NewSoundB:
+                        ChangedPairs=[(OldSoundB,NewSoundB,)]
+                    if OldSoundC!=OldSoundC:
+                        ChangedPairs.append((OldSoundC,NewSoundC,))
+
+                    if ChangedPairs:
+                        for (OldSound,NewSound) in ChangedPairs:
+                            if Deb:    print('posthoc rule '+SoundRule.__name__+' changed '+OldSound+' to '+NewSound)
+            
+            return NewMe
+
+    def summary(self):
+        for FtName,Val in self.__dict__.items():
+            print(FtName,Val)
+    def get_mecabline(self):
+        Str=''
+        Orth=self.orth
+        if Orth:
+            Str=Orth
+            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
+            FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
+            Rest=','.join(FtsNonEmpty)
+            Str=Str+'\t'+Rest
+        return Str
+    def get_mecabdicline(self):
+        Str=''
+        Orth=self.orth
+        if Orth:
+            Str=Orth
+            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
+            FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
+            Rest=','.join(FtsNonEmpty)
+            Str=Str+',0,0,0,'+Rest
+        return Str
+
+
 def line2wdfts(Line,CorpusOrDic):
     if CorpusOrDic=='corpus':
         Wd,FtStr=Line.strip().split('\t')
