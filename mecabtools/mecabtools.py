@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil,subprocess
+import re, imp, os, sys, time, shutil,subprocess,collections
 from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
 from collections import defaultdict,OrderedDict
@@ -12,6 +12,36 @@ except:
 # SentLine:
 
 Debug=0
+HomeDir=os.getenv('HOME')
+
+def line2wdfts(Line,CorpusOrDic):
+    if CorpusOrDic=='corpus':
+        Wd,FtStr=Line.strip().split('\t')
+        Fts=tuple(FtStr.split(','))
+    elif CorpusOrDic=='dic':
+        WdFts=Line.strip().split(',')
+        Wd=WdFts[0]
+        Fts=tuple(WdFts[4:])
+    return Wd,Fts
+
+def eos_p(Line):
+    return Line.strip()=='EOS'
+
+def unknown_p(Line):
+    return Line.strip().endswith('*')
+
+def not_proper_jp_p(Line):
+    return (eos_p(Line) or unknown_p(Line) )
+
+def count_words(MecabCorpusFP):
+    CountDict=collections.defaultdict(int)
+    for LiNe in open(MecabCorpusFP):
+        if not (not_proper_jp_p(LiNe)):
+            CountDict[line2wdfts(LiNe,'corpus')]+=1
+    return CountDict
+
+#count_words(HomeDir+'/Dropbox/testFiles/corpora/test.mecab')
+
 
 def pick_lines(FP,OrderedLineNums):
     with open(FP) as FSw:
