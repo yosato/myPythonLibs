@@ -33,12 +33,16 @@ class MecabWdParse:
         self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
         self.sem='*'; self.infpat='*'; self.infform='*'
         self.soundrules=[]; self.variants=[]
+        self.count=0
 
 #        if 'lexeme' in AVPairs.keys():
  #           self.initialise_features_fromlexeme(AVPairs)
   #      else:
    #         self.initialise_features_withoutlexeme(AVPairs)
 
+    def add_count(self,By=1):
+        self.count=self.count+By
+   
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
         self.initialise_features(AVDic)
