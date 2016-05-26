@@ -31,11 +31,15 @@ class MecabWdParse:
     def __init__(self,**AVPairs):
 #Lexeme='',Feats={},Variants=[],SoundRules=[],CtxtB='',CtxtA='',Cat='*',Subcat='*',Subcat2='*',Sem='*',Lemma='*',InfPat='*',InfForm='*',Reading='*'):
         Fts=AVPairs.keys()
-        if ('orth' in Fts and 'lexeme' in Fts) or ('orth' not in Fts and 'lexeme' not in Fts):
-            sys.exit('you must have either orth or lexeme for word (and not both)')
-        # just populating in case 
-        self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
-        self.sem='*'; self.infpat='*'; self.infform='*'
+        if not ('orth' in Fts or 'lemma' in Fts):
+            sys.exit('you must have orth and lemma)')
+        else:
+            for Ft,Val in AVPairs.items():
+                self.__dict__[Ft]=Val
+#            self.lemma=AVPairs['lemma']
+ #       # just populating in case 
+  #      self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
+   #     self.sem='*'; self.infpat='*'; self.infform='*'
         self.soundrules=[]; self.variants=[]
         self.count=0
 
