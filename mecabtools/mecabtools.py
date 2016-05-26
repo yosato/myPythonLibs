@@ -22,7 +22,11 @@ def mecabline2avpairs(MecabLine):
     else:
         MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*')
 
-
+class MecabWdCluster:
+    def __init__(self,MecabWdParse,CoreFtNames):
+        self.wd=MecabWdParse
+        self.core_fts=[ MecabWdParse ]
+        
 class MecabWdParse:
     def __init__(self,**AVPairs):
 #Lexeme='',Feats={},Variants=[],SoundRules=[],CtxtB='',CtxtA='',Cat='*',Subcat='*',Subcat2='*',Sem='*',Lemma='*',InfPat='*',InfForm='*',Reading='*'):
