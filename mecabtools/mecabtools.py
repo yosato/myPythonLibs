@@ -42,6 +42,8 @@ class MecabWdParse:
    #     self.sem='*'; self.infpat='*'; self.infform='*'
         self.soundrules=[]; self.variants=[]
         self.count=0
+        self.poss=[]
+        self.lexpos=None
 
 #        if 'lexeme' in AVPairs.keys():
  #           self.initialise_features_fromlexeme(AVPairs)
@@ -247,10 +249,12 @@ def not_proper_jp_p(Line):
     return (eos_p(Line) or unknown_p(Line) )
 
 def count_words(MecabCorpusFP):
-    CountDict=collections.defaultdict(int)
-    for LiNe in open(MecabCorpusFP):
+    CountDict=collections.defaultdict(list)
+    FSr=open(MecabCorpusFP)
+    for Cntr,LiNe in enumerate(FSr):
         if not (not_proper_jp_p(LiNe)):
-            CountDict[line2wdfts(LiNe,'corpus')]+=1
+            CountDict[line2wdfts(LiNe,'corpus')].append(Cntr+1)
+    FSr.close()
     return CountDict
 
 #count_words(HomeDir+'/Dropbox/testFiles/corpora/test.mecab')
