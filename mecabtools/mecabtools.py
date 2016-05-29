@@ -41,10 +41,13 @@ class MecabWdParse:
   #      self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
    #     self.sem='*'; self.infpat='*'; self.infform='*'
         self.soundrules=[]; self.variants=[]
-        self.count=0
-        self.poss=[]
+        self.count=None
+        self.poss=None
         self.lexpos=None
 
+    def set_poss(self,Poss):
+        self.poss=Poss
+        self.count=len(Poss)
 #        if 'lexeme' in AVPairs.keys():
  #           self.initialise_features_fromlexeme(AVPairs)
   #      else:
@@ -212,7 +215,7 @@ class MecabWdParse:
         Orth=self.orth
         if Orth:
             Str=Orth
-            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
+            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.inftype,self.infform,self.lemma,self.reading,self.pronunciation]
             FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
             Rest=','.join(FtsNonEmpty)
             Str=Str+'\t'+Rest
