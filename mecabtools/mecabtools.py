@@ -53,6 +53,9 @@ class MecabWdParse:
   #      else:
    #         self.initialise_features_withoutlexeme(AVPairs)
 
+    def set_count(self,Cnt):
+        self.count=Cnt
+        
     def add_count(self,By=1):
         self.count=self.count+By
    
@@ -252,11 +255,11 @@ def not_proper_jp_p(Line):
     return (eos_p(Line) or unknown_p(Line) )
 
 def count_words(MecabCorpusFP):
-    CountDict=collections.defaultdict(list)
+    CountDict=collections.defaultdict(int)
     FSr=open(MecabCorpusFP)
     for Cntr,LiNe in enumerate(FSr):
         if not (not_proper_jp_p(LiNe)):
-            CountDict[line2wdfts(LiNe,'corpus')].append(Cntr+1)
+            CountDict[line2wdfts(LiNe,'corpus')]+=1
     FSr.close()
     return CountDict
 
