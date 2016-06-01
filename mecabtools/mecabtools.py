@@ -253,7 +253,7 @@ def unknown_p(Line):
 
 def symbol_p(Line):
     import string
-    Bads=tuple(string.punctuations+string.whitespace)
+    Bads=tuple(string.punctuation+string.whitespace)
     if Line.startswith(Bads):
         return True
     elif re.match(r'..*\t記号',Line):
@@ -261,7 +261,7 @@ def symbol_p(Line):
     return False
     
 def not_proper_jp_p(Line):
-    return (eos_p(Line) or unknown_p(Line) )
+    return (eos_p(Line) or unknown_p(Line) or symbol_p(Line))
 
 def count_words(MecabCorpusFP):
     CountDict=collections.defaultdict(int)
