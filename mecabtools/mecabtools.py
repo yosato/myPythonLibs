@@ -251,6 +251,15 @@ def eos_p(Line):
 def unknown_p(Line):
     return Line.strip().endswith('*')
 
+def symbol_p(Line):
+    import string
+    Bads=tuple(string.punctuations+string.whitespace)
+    if Line.startswith(Bads):
+        return True
+    elif re.match(r'..*\t記号',Line):
+        return True
+    return False
+    
 def not_proper_jp_p(Line):
     return (eos_p(Line) or unknown_p(Line) )
 
