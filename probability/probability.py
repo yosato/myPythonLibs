@@ -1,4 +1,4 @@
-import imp,sys,math,copy,collections,fractions,pdb,decimal
+import imp,sys,math,copy,collections,fractions,pdb,decimal,random
 from collections import defaultdict
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
@@ -98,10 +98,22 @@ class DiscDist(EquivalEqual):
         else:
             return False
 
+def get_cum_list(List):
+    Cum=0;NewList=[]
+    for El in List:
+        NewList.append(Cum+El)
+    return NewList
 
-
-
-
+    
+def rand_biased(DiscDist):
+    from collections import OrderedDict
+    CumDiscDist=OrderedDict();PrvProb=0
+    for Evt,Prob in DiscDist.evtprob().items():
+        CumDiscDist[PrvProb+Prob]=Evt
+    RandFloat=random.random()
+    Key=next(Upper>RandFloat for Upper in CumDiscDist.keys())
+    return CumDiscDist[Key]
+    
 def sents2countdic(Sents):
     CntDic={}
     for Sent in Sents:
