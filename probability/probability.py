@@ -28,22 +28,26 @@ class DiscDist(EquivalEqual):
       discrete distribution of one random var. from occurrences, you mainly get marginal prob.
       obligatory input: normally a dict representing {evt:occ} 
     '''
-    def __init__(self,EvtProbPairsOrEvtOccPairs,Occs={},TotalOccs=0):
+    def __init__(self,EvtProbPairsOrEvtOccPairs,Smooth=False,Occs={},TotalOccs=0):
         super().__init__()
         Samples=EvtProbPairsOrEvtOccPairs.values()
-        if all(Sample < 1 for Sample in Samples):
+        # this is the case of probabilities, each needs to be a float
+        if all(type(Sample).__name__=='float' for Sample in Samples) and sum(Samples)==1:
             EvtProbPairs=EvtProbPairsOrEvtOccPairs
+            self.occs=0
             self.evtocc=Occs
             self.totalocc=TotalOccs
-            if not self.sum_check():
-                sys.exit('probability does not sum to one')
+
+        # this is the case of occurrences
         else:
+            EvtsOccs=EvtProbPairsOrEvtOccPairs
             if any(isinstance(Sample,float) for Sample in Samples):
                 self.occadjusted=True
             else:
                 self.occadjusted=False
             
-            self.evtocc=EvtProbPairsOrEvtOccPairs
+            self.evtocc=(EvtsOccs if not Smooth else { Evt:Occ+1 for (Evt,Occ) in EvtsOccs.items()})
+            
             self.occs=[ Occ for Occ in self.evtocc.values() ]
             self.totalocc=sum(self.occs)
             
@@ -106,13 +110,18 @@ def get_cum_list(List):
 
     
 def rand_biased(DiscDist):
-    from collections import OrderedDict
-    CumDiscDist=OrderedDict();PrvProb=0
-    for Evt,Prob in DiscDist.evtprob().items():
-        CumDiscDist[PrvProb+Prob]=Evt
+    # this gives a random float 0-1
     RandFloat=random.random()
-    Key=next(Upper>RandFloat for Upper in CumDiscDist.keys())
-    return CumDiscDist[Key]
+    Items=list(DiscDist.evtprob.items())
+    #and you cumulate the probs of evts
+    CumProb=0
+    for Evt,Prob in Items:
+        CumProb=CumProb+Prob
+        # and if the random float exceeds, return that event 
+        if CumProb>RandFloat:
+            return Evt
+    return Items[-1][0]
+
     
 def sents2countdic(Sents):
     CntDic={}
