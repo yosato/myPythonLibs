@@ -1954,8 +1954,9 @@ def jsonify_diclist(DicList):
         return jsonify_dic(DicList)
     elif isinstance(DicList,list):
         return jsonify_list(DicList)
-
-
+    else:
+        sys.exit('this is '+type(DicList).__name__+', not jsonable')
+        
 def dejsonify_diclist(DicList):
     if isinstance(DicList,dict):
         return dejsonify_dic(DicList)
@@ -2076,7 +2077,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         PureJson=json.loads(open(FP,'rt').read())
         Json=dejsonify_diclist(PureJson)
         
-        return Json
+        return Json,True
     else:
         (Bool,DirectP)=jsonable_p(Response)
         if not Bool:
@@ -2086,7 +2087,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         else:
             ToJson=jsonify_diclist(Response)
         open(FP,'wt').write(json.dumps(ToJson))
-        return Response
+        return Response,False
 
 
     

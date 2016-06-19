@@ -102,6 +102,25 @@ class DiscDist(EquivalEqual):
         else:
             return False
 
+class CondDists:
+    def __init__(self,CDsR):
+        self.u1s_pds={Wd:DiscDist(PostD) for (Wd,PostD) in CDsR.items()}
+        self.u1scnts={Wd:PostD.totalocc for (Wd,PostD) in self.u1s_pds.items()}
+        self.totalocc_bi=sum([PD.totalocc for PD in self.u1s_pds.values()])
+        
+        U2sCnts=defaultdict(int)
+        for PostD in self.u1s_pds.values():
+            for Wd,Cnt in PostD.evtocc.items():
+                U2sCnts[Wd]+=Cnt
+        self.u2scnts=U2sCnts
+        self.totalocc_u2var=sum(self.u2scnts.values())
+
+    def get_uniprob_specwd(self,SpecWd,OneTwo):
+        if OneTwo==1:
+            return self.u1scnts[SpecWd]/self.totalocc_bi
+        if OneTwo==2:
+            return self.u2scnts[SpecWd]/self.totalocc_u2var
+    
 def get_cum_list(List):
     Cum=0;NewList=[]
     for El in List:
