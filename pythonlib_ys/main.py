@@ -1924,6 +1924,18 @@ class JsonManip:
             except TypeError:
                 json.dumps(self.serialise_stuff_if_nec(self.stuff))
 
+def jsonify_tupledic(TupleDic):
+    ListedTD=[]
+    for (TupleKey,Val) in TupleDic.items():
+        ListedTD.append((list(TupleKey),Val))
+    return ListedTD
+
+def revive_tupledic(ListedTD):
+    BackToDic={}
+    for (ListedKey,Val) in ListedTD:
+        BackToDic[tuple(ListedKey)]=Val
+    return BackToDic
+
 def jsonable_p(Obj,DirectP=True):
     JsonableAtoms=[ 'str', 'int', 'float' ]
 #    JsonableCollects=[ 'dict', 'list' ]
@@ -2085,7 +2097,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         elif DirectP:
             ToJson=Response
         else:
-            ToJson=jsonify_diclist(Response)
+            ToJson=jsonify_tupledic(Response)
         open(FP,'wt').write(json.dumps(ToJson))
         return Response,False
 
