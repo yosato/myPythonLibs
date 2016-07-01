@@ -531,10 +531,10 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
     else:
         if prompt_loop_bool(Message+' i.e. '+str(FPs)+'?',TO=TO,Default=DefaultReuse):
             RedoIt=False
-            print('we are redoing')
-        else:
-            RedoIt=Truenono
             print('we use the old file')
+        else:
+            RedoIt=True
+            print('we are redoing')
     
     if Backup and FileExistP and RedoIt:
         for FP in FPs:
@@ -1935,17 +1935,16 @@ class JsonManip:
                 json.dumps(self.serialise_stuff_if_nec(self.stuff))
 
 def jsonify_tupledic(TupleDic):
-    ListedTD=[]
     for (TupleKey,Val) in TupleDic.items():
-        ListedTD.append((list(TupleKey),Val))
-    return ListedTD
+        yield (list(TupleKey),Val)
 
 def revive_tupledic(ListedTD):
     BackToDic={}
     for (ListedKey,Val) in ListedTD:
         BackToDic[tuple(ListedKey)]=Val
-    return BackToDic
+        return BackToDic
 
+'''
 def jsonable_p(Obj,DirectP=True):
     JsonableAtoms=[ 'str', 'int', 'float' ]
 #    JsonableCollects=[ 'dict', 'list' ]
@@ -1968,7 +1967,7 @@ def jsonable_p(Obj,DirectP=True):
         else:
             return False,DirectP
 
-
+'''
             
 
 def jsonify_diclist(DicList):
