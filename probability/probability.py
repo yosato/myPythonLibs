@@ -219,11 +219,14 @@ def all_mis(M1,M2,Joint):
     if Joint==1:
         PMI=NPMI=MI=NMI=0
     else:
+        MargProd=M1*M2
         PMI=pointwise_mutual_info(M1,M2,Joint)
         NPMI=normalised_pmi(PMI,Joint)
         MI=mutual_info_unit(M1,M2,Joint)
         NMI=MI/-math.log(Joint,2)
-    return (MI,NMI),(PMI,NPMI)
+        MD=math.log(math.pow(Joint,2)/MargProd,2)
+        PMD=MD+math.log(Joint,2)
+    return {'mi':MI,'nmi':NMI,'pmi':PMI,'npmi':NPMI,'md':MD,'pmd':PMD}
 
 def pointwise_mutual_info(Marg1,Marg2,Joint):
     return math.log(Joint/(Marg1*Marg2),2)

@@ -531,8 +531,10 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
     else:
         if prompt_loop_bool(Message+' i.e. '+str(FPs)+'?',TO=TO,Default=DefaultReuse):
             RedoIt=False
+            print('we are redoing')
         else:
-            RedoIt=True
+            RedoIt=Truenono
+            print('we use the old file')
     
     if Backup and FileExistP and RedoIt:
         for FP in FPs:
@@ -1322,6 +1324,14 @@ def select_prompt(OrgOpts,Conj,Numbered=False):
 
     return SelPr
 
+
+def merge_countdics0(CumDic,DicToAdded):
+    for Key,Cnt in DicToAdded.items():
+        if Key in CumDic.keys():
+            CumDic[Key]+=1
+        else:
+            CumDic[Key]=1
+
 def merge_countdics(Dic1,Dic2):
     NewDic={}
     Only1=set(Dic1.keys())-set(Dic2.keys())
@@ -1333,7 +1343,7 @@ def merge_countdics(Dic1,Dic2):
             NewDic[Key]=Dic1[Key]+Dic2[Key]
     for Key in Only2:
         NewDic[Key]=Dic2[Key]
-    return NewDic
+    return NewDic            
             
 
 
@@ -2083,13 +2093,14 @@ def destringify_halfjsonable(StringifiedTuple):
 
 
 def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
-    import json
-    Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
+    import json,shutil
+    Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=False)
+    ReusedP=DefaultReuse
     if Response is False:
         PureJson=json.loads(open(FP,'rt').read())
         Json=dejsonify_diclist(PureJson)
-        
-        return Json,True
+        ReusedP=True
+        return Json,ReusedP
     else:
         (Bool,DirectP)=jsonable_p(Response)
         if not Bool:
@@ -2098,8 +2109,16 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
             ToJson=Response
         else:
             ToJson=jsonify_tupledic(Response)
-        open(FP,'wt').write(json.dumps(ToJson))
-        return Response,False
+        ReusedP=False
+        TmpFP=FP+'.tmp'
+        with open(TmpFP,'wt') as FSw:
+            FSw.write(json.dumps(ToJson))
+            
+        if Backup:
+            shutil.copy(FP,FP+'.bak')
+        shutil.move(TmpFP,FP)
+        
+        return Response,ReusedP
 
 
     
