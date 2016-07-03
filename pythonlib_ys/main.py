@@ -1936,7 +1936,7 @@ class JsonManip:
 
 def jsonify_tupledic(TupleDic):
     for (TupleKey,Val) in TupleDic.items():
-        yield (list(TupleKey),Val)
+        yield [list(TupleKey),Val]
 
 def revive_tupledic(ListedTD):
     BackToDic={}
