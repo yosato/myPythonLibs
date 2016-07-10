@@ -217,7 +217,7 @@ def mutual_info_unit(Marg1,Marg2,Joint):
 def all_mis(M1,M2,Joint):
     M1=float(M1); M2=float(M2); Joint=float(Joint)
     if Joint==1:
-        PMI=NPMI=MI=NMI=0
+        PMI=NPMI=MI=NMI=MD=PMD=0
     else:
         MargProd=M1*M2
         PMI=pointwise_mutual_info(M1,M2,Joint)

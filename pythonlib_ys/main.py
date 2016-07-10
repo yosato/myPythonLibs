@@ -521,7 +521,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         return Response,True
 '''
 
-def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
+def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=False):
     if type(FPs).__name__=='str':
         FPs=[FPs]
     FileExistP=check_exist_paths(FPs)
@@ -531,10 +531,10 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
     else:
         if prompt_loop_bool(Message+' i.e. '+str(FPs)+'?',TO=TO,Default=DefaultReuse):
             RedoIt=False
-            print('we use the old file')
+            print('we use the processed old file')
         else:
             RedoIt=True
-            print('we are redoing')
+            print('for this file we are redoing '+repr(Function))
     
     if Backup and FileExistP and RedoIt:
         for FP in FPs:
@@ -554,6 +554,37 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             #    return None
         return True
     return False
+
+def ask_filenoexist_execute0(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
+    if type(FPs).__name__=='str':
+        FPs=[FPs]
+    FileExistP=check_exist_paths(FPs)
+    RedoIt=not DefaultReuse
+    if not FileExistP:
+        RedoIt=True
+    else:
+        if prompt_loop_bool(Message+' i.e. '+str(FPs)+'?',TO=TO,Default=DefaultReuse):
+            RedoIt=False
+            print('we use the processed old file')
+        else:
+            RedoIt=True
+            print('for this file we are redoing '+repr(Function))
+    
+    if Backup and FileExistP and RedoIt:
+        for FP in FPs:
+            if os.path.getsize(FP)>10000:
+                print('backing up '+FP)
+                run_stuff_exit(['cp',FP,FP+'.bak'])
+    if RedoIt:
+        if type(ArgsKArgs).__name__!='tuple' or type(ArgsKArgs[0]).__name__!='list' or type(ArgsKArgs[1]).__name__!='dict':
+            sys.exit('arg arg needs to be tuple(list,dict)')
+        else:
+            (Args,KArgs)=ArgsKArgs
+            Return=Function(*Args,**KArgs)
+            #if Return:
+    else:
+        Return=False
+    return Return,RedoIt
 
 
 def dicval_sum(Dic):
@@ -592,7 +623,7 @@ def run_stuff_exit(CmdLst,Shell=False,StdOut=False):
         return StdOut.decode('utf-8')
 
 
-def prepare_progressconsts(Tgt,TgtType='filename'):
+def prepare_progressconsts(Tgt,KnownCnt=None,TgtType='filename'):
     import datetime
     Type=type(Tgt).__name__
     if Type=='list' or Type=='dict':
@@ -600,10 +631,10 @@ def prepare_progressconsts(Tgt,TgtType='filename'):
     elif Type=='str' and len(Tgt)>10000:
         TgtType='str'
     if TgtType=='filename':
-        Cnt=get_linecount(Tgt)
+        Cnt=(KnownCnt if KnownCnt else get_linecount(Tgt))
     elif TgtType=='iter' or TgtType=='str':
         Cnt=len(Tgt)
-    print('process starting')    
+#    print('process starting')    
     return (Cnt,datetime.datetime.now(),)
 
 def return_stack():
@@ -1328,9 +1359,9 @@ def select_prompt(OrgOpts,Conj,Numbered=False):
 def merge_countdics0(CumDic,DicToAdded):
     for Key,Cnt in DicToAdded.items():
         if Key in CumDic.keys():
-            CumDic[Key]+=1
+            CumDic[Key]+=DicToAdded[Key]
         else:
-            CumDic[Key]=1
+            CumDic[Key]=DicToAdded[Key]
 
 def merge_countdics(Dic1,Dic2):
     NewDic={}
@@ -1621,7 +1652,10 @@ def identify_chartype(Char):
 
 def identify_type_char(Char):
     TCMap={'num': [(48,57,),(65296,65305,)],
-           'roman': [('0041','005a',),('0061','0077',),('ff21','ff3a',),('ff41','ff5a',)],
+        'ws': [('0009','0009',),('000A','000D',),('0020','0020',),('3000','3000',)],
+           'roman': [('0041','005a',),('0061','007a',),('ff21','ff3a',),('ff41','ff5a',)],
+           'romanext':[('00c0','01f7')],
+           'romanadd':[('1e00','1eff')],
            'asciisym': [('0000','002f',),('007b','00bb'), (58,64,),(91,96,),(123,126,)],#ascii symbols
            'cjksym':[(8192,8303,),(8591,8597,),(9632, 9983,),('3000','3004',),('3008','303f',),(65280,65519,)],
         'shape':[('25a0','25ff')],
@@ -1630,7 +1664,7 @@ def identify_type_char(Char):
         'katakana': [('30a0','30ff',)],
         'hangul': [('AC00','D7AF',)], 
         'jamo': [('1100','11FF',),('3130','318f',)],
-        'ws': [('0009','0009',),('000A','000D',),('0020','0020',),('3000','3000',)],
+
      }
 
     for (Type,Ranges) in TCMap.items():
@@ -1665,7 +1699,7 @@ def at_least_one_of_chartypes_p(Str,Types,UnivTypes=[]):
     return Bool
 
 
-def of_chartypes_p(Char,Types,UnivTypes=[]):
+def of_chartypes_p(Char,Types,UnivTypes=['ws']):
     Types.extend(UnivTypes)
     CharType=identify_type_char(Char)
     return CharType in Types
@@ -1934,15 +1968,23 @@ class JsonManip:
             except TypeError:
                 json.dumps(self.serialise_stuff_if_nec(self.stuff))
 
-def jsonify_tupledic(TupleDic):
+def jsonify_tupledic_gen(TupleDic):
     for (TupleKey,Val) in TupleDic.items():
         yield [list(TupleKey),Val]
+
+def jsonify_tupledic(TupleDic,ChunkCnt):
+    Listeds=[]
+    for Cntr,(TupleKey,Val) in enumerate(TupleDic.items()):
+        Listeds.append([list(TupleKey),Val])
+        if Cntr!=0 and Cntr%ChunkCnt==0:
+            yield Listeds
+    yield Listeds
 
 def revive_tupledic(ListedTD):
     BackToDic={}
     for (ListedKey,Val) in ListedTD:
         BackToDic[tuple(ListedKey)]=Val
-        return BackToDic
+    return BackToDic
 
 '''
 def jsonable_p(Obj,DirectP=True):
