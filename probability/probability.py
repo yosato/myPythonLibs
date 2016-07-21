@@ -214,7 +214,7 @@ def entropy_unit(Prob):
 def mutual_info_unit(Marg1,Marg2,Joint):
     return pointwise_mutual_info(Marg1,Marg2,Joint)*Joint
 
-def all_mis(M1,M2,Joint):
+def all_mis(M1,M2,Joint,PWeight=1):
     M1=float(M1); M2=float(M2); Joint=float(Joint)
     if Joint==1:
         PMI=NPMI=MI=NMI=MD=PMD=0
@@ -225,7 +225,7 @@ def all_mis(M1,M2,Joint):
         MI=mutual_info_unit(M1,M2,Joint)
         NMI=MI/-math.log(Joint,2)
         MD=math.log(math.pow(Joint,2)/MargProd,2)
-        PMD=MD+math.log(Joint,2)
+        PMD=MD+math.log(Joint*PWeight,2)
     return {'mi':MI,'nmi':NMI,'pmi':PMI,'npmi':NPMI,'md':MD,'pmd':PMD}
 
 def pointwise_mutual_info(Marg1,Marg2,Joint):
