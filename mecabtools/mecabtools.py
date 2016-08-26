@@ -284,7 +284,7 @@ def pick_lines(FP,OrderedLineNums):
 
 def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
     ContentsLines=OrderedDict()
-    with open(FP) as FSr:
+    with open(FP,encoding='utf8',errors='replace') as FSr:
         for Cntr,LiNe in enumerate(FSr):
             Line=LiNe.strip()
             FtEls=Line.split(',')
