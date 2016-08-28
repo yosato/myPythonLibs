@@ -14,13 +14,14 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
-def mecabline2avpairs(MecabLine):
-    Wd,Fts=line2wdfts()
+def mecabline2mecabwd(MecabLine,CorpusOrDic):
+    Wd,Fts=line2wdfts(MecabLine,CorpusOrDic)
     if len(Fts)>=8:
         Cat=Fts[0]
         MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7])
     else:
         MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*')
+    return MecabWd
 
 class MecabWdCluster:
     def __init__(self,MecabWdParse,CoreFtNames):
@@ -29,13 +30,18 @@ class MecabWdCluster:
         
 class MecabWdParse:
     def __init__(self,**AVPairs):
-#Lexeme='',Feats={},Variants=[],SoundRules=[],CtxtB='',CtxtA='',Cat='*',Subcat='*',Subcat2='*',Sem='*',Lemma='*',InfPat='*',InfForm='*',Reading='*'):
+
         Fts=AVPairs.keys()
         if not ('orth' in Fts or 'lemma' in Fts):
             sys.exit('you must have orth and lemma)')
         else:
             for Ft,Val in AVPairs.items():
                 self.__dict__[Ft]=Val
+
+        self.orthtypes=self.get_orthtypes()
+
+        if self.cat=='動詞':
+            self.divide_stem_suffix()
 #            self.lemma=AVPairs['lemma']
  #       # just populating in case 
   #      self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
@@ -58,7 +64,27 @@ class MecabWdParse:
         
     def add_count(self,By=1):
         self.count=self.count+By
-   
+
+    def get_orthtypes(self):
+        Types=[];PrvType=''
+        for Char in self.orth:
+            CurType=myModule.identify_chartype(Char)
+            if CurType!=PrvType:
+                Types.append(CurType)
+        return Types
+
+    def divide_stem_suffix(self):
+        if self.subcat1=='一段':
+            if self.infform in ('未然形','連用形',):
+                self.stem=self.orth[:-1]
+                self.suffix=self.orth[-1]
+            else:
+                self.orth=self.orth[:-2]
+                self.orth=self.orth[-2:]
+        else:
+            self.stem=self.orth[:-1]
+            self.suffix=self.orth[-1]
+        
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
         self.initialise_features(AVDic)
