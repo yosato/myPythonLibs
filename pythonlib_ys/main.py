@@ -1904,6 +1904,8 @@ def kana2kana_wd(Str):
     return NewWd
     
 def kana2kana(Char):
+    if Char=='ー':
+        return Char
     KanaCand=identify_type_char(Char)
     if KanaCand=='hiragana':
         ConvKana=chr(ord(Char)+96)

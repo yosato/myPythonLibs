@@ -71,16 +71,17 @@ class MecabWdParse:
             CurType=myModule.identify_chartype(Char)
             if CurType!=PrvType:
                 Types.append(CurType)
+            PrvType=CurType
         return Types
 
     def divide_stem_suffix(self):
-        if self.subcat1=='一段':
-            if self.infform in ('未然形','連用形',):
+        if self.infpat=='一段':
+            if any(Pat in self.infform for Pat in ('未然','連用','命令')):
                 self.stem=self.orth[:-1]
                 self.suffix=self.orth[-1]
             else:
-                self.orth=self.orth[:-2]
-                self.orth=self.orth[-2:]
+                self.stem=self.orth[:-2]
+                self.suffix=self.orth[-2:]
         else:
             self.stem=self.orth[:-1]
             self.suffix=self.orth[-1]
