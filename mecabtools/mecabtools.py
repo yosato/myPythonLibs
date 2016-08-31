@@ -18,9 +18,9 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic):
     Wd,Fts=line2wdfts(MecabLine,CorpusOrDic)
     if len(Fts)>=8:
         Cat=Fts[0]
-        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7])
+        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8])
     else:
-        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*')
+        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*',reading='*',pronunciation='*')
     return MecabWd
 
 class MecabWdCluster:
@@ -245,7 +245,7 @@ class MecabWdParse:
         Orth=self.orth
         if Orth:
             Str=Orth
-            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.inftype,self.infform,self.lemma,self.reading,self.pronunciation]
+            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
             FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
             Rest=','.join(FtsNonEmpty)
             Str=Str+'\t'+Rest
