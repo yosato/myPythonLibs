@@ -11,6 +11,23 @@ sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #answer = input(prompt)
 #t.cancel()
 
+def ngram_lines(FP,N,OutFP=None):
+    if not OutFP:
+        Out=sys.stdout
+    else:
+        Out=open(OutFP,'wt')
+    with open(FP) as FSr:
+        for LiNe in FSr:
+            Line=LiNe.strip()
+            if Line:
+                LineEls=Line.split()
+                Chunks=chunk_list(LineEls,N,Overlap=N-1)
+                ChunkStrs=[' '.join(Chunk) for Chunk in Chunks]
+                Str='\n'.join(ChunkStrs)
+                Out.write(Str+'\n')
+    if OutFP:
+        Out.close()
+
 def encode_json_write(LofStuff,OutFP):
     with open(OutFP,'wt') as FSw:
         for Item in LofStuff:
