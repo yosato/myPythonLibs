@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil,subprocess,collections
+import re, imp, os, sys, time, shutil,subprocess,collections, copy
 from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
 from collections import defaultdict,OrderedDict
@@ -14,14 +14,27 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
-def mecabline2mecabwd(MecabLine,CorpusOrDic):
-    Wd,Fts=line2wdfts(MecabLine,CorpusOrDic)
+def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=False):
+    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost=WithCost)
+    if WithCost:
+        Fts,Costs=FtsCosts
+    else:
+        Fts=FtsCosts;Costs=None
     if len(Fts)>=8:
         Cat=Fts[0]
-        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8])
+        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8],costs=Costs)
     else:
-        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*',reading='*',pronunciation='*')
+        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*',reading='*',pronunciation='*',costs=Costs)
     return MecabWd
+
+def search_feat(MWds,Ft,Val,FstOnly=False):
+    Fnd=[]
+    for MWd in MWds:
+        if MWd.__dict__[Ft]==Val:
+            Fnd.append(MWd)
+            if FstOnly:
+                return Fnd
+    return Fnd
 
 class MecabWdCluster:
     def __init__(self,MecabWdParse,CoreFtNames):
@@ -40,7 +53,7 @@ class MecabWdParse:
 
         self.orthtypes=self.get_orthtypes()
 
-        if self.cat=='動詞':
+        if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
 #            self.lemma=AVPairs['lemma']
  #       # just populating in case 
@@ -75,17 +88,34 @@ class MecabWdParse:
         return Types
 
     def divide_stem_suffix(self):
-        if self.infpat=='一段':
-            if any(Pat in self.infform for Pat in ('未然','連用','命令')):
+        if self.cat=='動詞':
+            if self.infpat=='一段':
+                if any(Pat in self.infform for Pat in ('未然','連用','命令')):
+                    self.stem=self.orth[:-1]
+                    self.suffix=self.orth[-1]
+                else:
+                    self.stem=self.orth[:-2]
+                    self.suffix=self.orth[-2:]
+            else:
                 self.stem=self.orth[:-1]
                 self.suffix=self.orth[-1]
+        elif self.cat=='形容詞':
+            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','けりゃ','し')
+            WhichEnding=[ Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) ]
+            if WhichEnding:
+                Ending=WhichEnding[0]
+                BoundInd=-len(Ending)
+                BoundIndAlt=BoundInd-1
+                if len(self.orth)> -(BoundIndAlt):
+                    PrvChar=self.orth[BoundIndAlt]
+                    if PrvChar in ('し','た','ぽ'):
+                        BoundInd=BoundIndAlt
+                self.stem=self.orth[:BoundInd]
+                self.suffix=self.orth[BoundInd:]
             else:
-                self.stem=self.orth[:-2]
-                self.suffix=self.orth[-2:]
-        else:
-            self.stem=self.orth[:-1]
-            self.suffix=self.orth[-1]
-        
+                self.stem=self.orth[:-1]
+                self.suffix=self.orth[-1:]
+            
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
         self.initialise_features(AVDic)
@@ -122,6 +152,11 @@ class MecabWdParse:
         else:
             self.__dict__[Ft]=Val
 
+    def get_variant(self,Ft,Val):
+        SelfCopy=copy.deepcopy(self)
+        SelfCopy.__dict__[Ft]=Val
+        return SelfCopy
+            
     def construct_lexeme(self,AVDic):
         Cat=AVDic['cat'];Lemma=AVDic['lemma']
         CommonFts=['subcat','subcat2','sem']
@@ -240,7 +275,7 @@ class MecabWdParse:
     def summary(self):
         for FtName,Val in self.__dict__.items():
             print(FtName,Val)
-    def get_mecabline(self):
+    def get_mecabline(self,):
         Str=''
         Orth=self.orth
         if Orth:
@@ -258,11 +293,14 @@ class MecabWdParse:
             Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
             FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
             Rest=','.join(FtsNonEmpty)
-            Str=Str+',0,0,0,'+Rest
+            if not self.costs:
+                Str=Str+',0,0,0,'+Rest
+            else:
+                Str+=','+','.join([str(Cost) for Cost in self.costs])+','+Rest
         return Str
 
 
-def line2wdfts(Line,CorpusOrDic):
+def line2wdfts(Line,CorpusOrDic,WithCost=False):
     if CorpusOrDic=='corpus':
         Wd,FtStr=Line.strip().split('\t')
         Fts=tuple(FtStr.split(','))
@@ -270,7 +308,11 @@ def line2wdfts(Line,CorpusOrDic):
         WdFts=Line.strip().split(',')
         Wd=WdFts[0]
         Fts=tuple(WdFts[4:])
-    return Wd,Fts
+        if WithCost:
+            Costs=tuple(WdFts[1:4])
+        else:
+            Costs=None
+    return Wd,(Fts,Costs)
 
 def eos_p(Line):
     return Line.strip()=='EOS'

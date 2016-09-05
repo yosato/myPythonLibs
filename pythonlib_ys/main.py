@@ -1,4 +1,4 @@
-import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil
+import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil,collections
 
 from pdb import set_trace
 sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
@@ -643,7 +643,7 @@ def run_stuff_exit(CmdLst,Shell=False,StdOut=False):
 def prepare_progressconsts(Tgt,KnownCnt=None,TgtType='filename'):
     import datetime
     Type=type(Tgt).__name__
-    if Type=='list' or Type=='dict':
+    if isinstance(Tgt,collections.abc.Iterable):
         TgtType='iter'
     elif Type=='str' and len(Tgt)>10000:
         TgtType='str'
