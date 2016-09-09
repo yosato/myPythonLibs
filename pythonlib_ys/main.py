@@ -1,5 +1,7 @@
 import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil,collections
 
+from collections import abc as abc
+
 from pdb import set_trace
 sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #from stringproc import *
@@ -643,7 +645,7 @@ def run_stuff_exit(CmdLst,Shell=False,StdOut=False):
 def prepare_progressconsts(Tgt,KnownCnt=None,TgtType='filename'):
     import datetime
     Type=type(Tgt).__name__
-    if isinstance(Tgt,collections.abc.Iterable):
+    if isinstance(Tgt,abc.Iterable):
         TgtType='iter'
     elif Type=='str' and len(Tgt)>10000:
         TgtType='str'
