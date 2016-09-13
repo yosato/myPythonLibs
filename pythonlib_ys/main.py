@@ -567,11 +567,6 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             (Args,KArgs)=ArgsKArgs
             Return=Function(*Args,**KArgs)
             return Return
-            #if Return:
-            #    return Return
-            #else:
-            #    return None
-        return True
     return False
 
 def ask_filenoexist_execute0(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
