@@ -640,14 +640,21 @@ def run_stuff_exit(CmdLst,Shell=False,StdOut=False):
 def prepare_progressconsts(Tgt,KnownCnt=None,TgtType='filename'):
     import datetime
     Type=type(Tgt).__name__
-    if isinstance(Tgt,abc.Iterable):
+    if Type=='str':
+        if len(Tgt)>10000:
+            TgtType='str'
+        else:
+            TgtType='filename'
+    elif isinstance(Tgt,abc.Iterable):
         TgtType='iter'
-    elif Type=='str' and len(Tgt)>10000:
-        TgtType='str'
-    if TgtType=='filename':
-        Cnt=(KnownCnt if KnownCnt else get_linecount(Tgt))
-    elif TgtType=='iter' or TgtType=='str':
-        Cnt=len(Tgt)
+
+    if KnownCnt:
+        Cnt=KnownCnt
+    else:
+        if TgtType=='filename':
+            Cnt=get_linecount(Tgt)
+        elif TgtType=='iter' or TgtType=='str':
+            Cnt=len(Tgt)
 #    print('process starting')    
     return (Cnt,datetime.datetime.now(),)
 
