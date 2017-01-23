@@ -3,7 +3,10 @@ from difflib import SequenceMatcher
 sys.path.append('./../myPythonLibs')
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
+import romkan
+import jp_morph
 imp.reload(myModule)
+imp.reload(jp_morph)
 try:
     from ipdb import set_trace
 except:
@@ -14,7 +17,94 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
-def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=False):
+DefIndsFts={0:'orth',1:'cat',2:'subcat',3:'subcat2',4:'sem',5:'infpat',6:'infform',7:'lemma',8:'reading',9:'pronunciation'}
+DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
+DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
+# the reverse list from ft to ind
+DefFtsInds={ Ft:Ind for (Ind,Ft) in DefIndsFts.items() }
+DefLexFtsInds={ Ft:Ind for (Ind,Ft) in DefLexIndsFts.items() }
+InfCats=('動詞','形容詞','助動詞')
+IrregPats=('不変化型','サ変','カ変')
+DinasourPats=('ラ変','文語','四段','下二','上二')
+
+def radicalise_mecabline(MecabCorpusLiNe):
+    Line=MecabCorpusLiNe.strip()
+    MWd=mecabline2mecabwd(Line,CorpusOrDic='corpus')
+    if MWd.cat=='助動詞' and (MWd.infpat=='特殊・ナイ' or MWd.infpat=='特殊・タイ'):
+        MWd.infpat='形容詞・イ段'
+    if not radicalisable_p(MWd):
+        return MecabCorpusLiNe
+    else:
+        return radicalise_mecabwd(MWd)
+
+
+def get_mecablines_wds(MWds):
+    Strs=''
+    for MWd in MWds:
+        Strs.append(MWd.get_mecabline())
+    return '\n'.join(MWds)+'\n'
+
+def radicalisable_p(MWd):
+    if MWd.cat not in InfCats:
+        return False
+    elif any(MWd.infpat.startswith(Pat) for Pat in IrregPats):
+        return False
+    elif MWd.infform=='連用テ接続' and MWd.cat=='形容詞' or (MWd.cat=='助動詞' and MWd.infpat.startswith('形容詞')):
+        return True
+
+    elif not MWd.infform.endswith('形') or MWd.infpat.startswith('特殊'):
+        return False
+    elif MWd.infpat=='一段' and any(MWd.infform==Form for Form in ('未然形','連用形')):
+        return False
+
+    elif any(MWd.infpat.startswith(Pat) for Pat in DinasourPats):
+        return False
+    return True
+
+def make_suffixline(Orth,InfForm,Cat,InfPat):
+    KatakanaOrth=jp_morph.render_kana(Orth,WhichKana='katakana')
+    return Orth+'\t'+Cat+'活用語尾,*,*,*,'+','.join([InfPat,InfForm,Orth]+[KatakanaOrth]*2)
+
+def radicalise_mecabwd(MWd):
+    def org2new(Stuff,Stem,Suffix,GodanP):
+        SuffixLen=len(Suffix)
+        if GodanP:
+            return Stuff[:-SuffixLen]+Stem[-1]
+        else:
+            return Stuff[:-SuffixLen]
+            
+    Stem,Suffix=MWd.divide_stem_suffix_radical()
+    GodanP=True if MWd.infpat.startswith('五段') else False
+    FtValPairs=[('orth',Stem),('infform','語幹'),('reading',org2new(MWd.reading,Stem,Suffix,GodanP)),('pronunciation',org2new(MWd.pronunciation,Stem,Suffix,GodanP))]
+    Var1LiNe=MWd.get_variant(FtValPairs).get_mecabline()
+
+    Var2LiNe=make_suffixline(Suffix,MWd.infform,MWd.cat,MWd.majorinfpat)+'\n'
+
+    return Var1LiNe+'\n'+Var2LiNe
+    
+def fts2inds(Fts,CorpusOrDic='dic'):
+    Mapping=DefLexIndsFts if CorpusOrDic=='dic' else DefIndsFts
+        
+    return sorted([Ind for (Ind,Ft) in Mapping.items() if Ft in Fts])
+
+def pick_feats_fromline(Line,RelvFts,IndsFts=None,CorpusOrDic='corpus'):
+    if not Line.strip():
+        print('empty line encountered')
+        return None
+    if not IndsFts:
+        IndsFts=DefIndsFts if CorpusOrDic=='corpus' else DefLexIndsFts
+    Line=Line.strip()
+    LineEls=Line.replace('\t',',').split(',')
+    FtCntInLine=len(LineEls)
+    RelvInds=fts2inds(RelvFts,CorpusOrDic=CorpusOrDic)
+    Pairs=[]
+    for Ind in RelvInds:
+        if Ind+1>FtCntInLine:
+            break
+        Pairs.append((IndsFts[Ind],LineEls[Ind]))
+    return Pairs
+    
+def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=True):
     Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost=WithCost)
     if WithCost:
         Fts,Costs=FtsCosts
@@ -63,6 +153,7 @@ class MecabWdParse:
         self.count=None
         self.poss=None
         self.lexpos=None
+        self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
 
     def set_poss(self,Poss):
         self.poss=Poss
@@ -78,6 +169,13 @@ class MecabWdParse:
     def add_count(self,By=1):
         self.count=self.count+By
 
+    def feature_identical(self,AnotherWd,Excepts=[]):
+        DefBool=True
+        for Ft in self.__dict__.keys():
+            if Ft not in Excepts and not self.__dict__[Ft]==AnotherWd.__dict__[Ft]:
+                return not DefBool
+        return DefBool
+
     def get_orthtypes(self):
         Types=[];PrvType=''
         for Char in self.orth:
@@ -87,18 +185,72 @@ class MecabWdParse:
             PrvType=CurType
         return Types
 
+    def divide_stem_suffix_radical(self):
+        InfType=None
+        if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ'))):
+            InfType='adj'
+        elif self.infpat.startswith('五段'):
+            InfType='godan'
+        if InfType=='adj':
+            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
+            try:
+                Suffix=next(Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) )
+                Stem=re.sub(r'%s$'%Suffix,'',self.orth)
+            except:
+                Suffix=''
+                Stem=self.orth
+
+        elif any(self.infpat.startswith(Pat) for Pat in ('サ変','カ変')):
+            Stem=self.orth
+            Suffix=''
+        elif InfType=='godan':
+            if any(self.infform.startswith(Form) for Form in ('連用タ接続','未然特殊','体言接続特殊')):
+                Stem=self.orth
+                Suffix=''
+            else:
+                Stem=self.lemma[:-1]+jp_morph.identify_gyo(self.lemma[-1],InRomaji=True)
+                
+                if Stem.endswith('u'):
+                    Stem=Stem[:-1]+'w'
+                if self.infform.startswith('仮定縮約'):
+                    Suffix='ya'
+                else:
+                    SuffixPlus=self.orth[len(Stem)-1:]
+                    try:
+                        Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
+                    except:
+                        jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
+        elif self.infpat.startswith('一段'):
+            Stem=self.lemma[:-1]
+            Suffix=self.orth[len(Stem):]
+        else:
+            sys.stderr.write('\nERROR for'+self.get_mecabline()+'\n')
+            sys.exit('ERROR: no category to classify, aborting\n')
+        
+        self.stem=Stem
+        self.suffix=Suffix
+
+        if not Suffix:
+            StemReading=self.reading
+        else:
+            StemReading=self.reading[:-len(self.suffix)]
+            if re.match(r'^.*[a-z]$',self.stem):
+                StemReading=StemReading+self.stem[-1]
+        
+        return (Stem,StemReading),Suffix
+    
     def divide_stem_suffix(self):
         if self.cat=='動詞':
             if self.infpat=='一段':
                 if any(Pat in self.infform for Pat in ('未然','連用','命令')):
-                    self.stem=self.orth[:-1]
-                    self.suffix=self.orth[-1]
+                    Stem=self.orth[:-1]
+                    Suffix=self.orth[-1]
                 else:
-                    self.stem=self.orth[:-2]
-                    self.suffix=self.orth[-2:]
+                    Stem=self.orth[:-2]
+                    Suffix=self.orth[-2:]
             else:
-                self.stem=self.orth[:-1]
-                self.suffix=self.orth[-1]
+                Stem=self.orth[:-1]
+                Suffix=self.orth[-1]
         elif self.cat=='形容詞':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','けりゃ','し')
             WhichEnding=[ Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) ]
@@ -110,12 +262,15 @@ class MecabWdParse:
                     PrvChar=self.orth[BoundIndAlt]
                     if PrvChar in ('し','た','ぽ'):
                         BoundInd=BoundIndAlt
-                self.stem=self.orth[:BoundInd]
-                self.suffix=self.orth[BoundInd:]
+                Stem=self.orth[:BoundInd]
+                Suffix=self.orth[BoundInd:]
             else:
-                self.stem=self.orth[:-1]
-                self.suffix=self.orth[-1:]
-            
+                Stem=self.orth[:-1]
+                Suffix=self.orth[-1:]
+        self.stem=Stem
+        self.suffix=Suffix
+        return Stem,Suffix
+                
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
         self.initialise_features(AVDic)
@@ -152,9 +307,10 @@ class MecabWdParse:
         else:
             self.__dict__[Ft]=Val
 
-    def get_variant(self,Ft,Val):
+    def get_variant(self,FtValPairs):
         SelfCopy=copy.deepcopy(self)
-        SelfCopy.__dict__[Ft]=Val
+        for Ft,Val in FtValPairs:
+            SelfCopy.__dict__[Ft]=Val
         return SelfCopy
             
     def construct_lexeme(self,AVDic):
@@ -275,7 +431,9 @@ class MecabWdParse:
     def summary(self):
         for FtName,Val in self.__dict__.items():
             print(FtName,Val)
-    def get_mecabline(self,):
+    def get_mecabline(self,CorpusOrDic='corpus'):
+        if CorpusOrDic=='dic':
+            return self.get_mecabdicline()
         Str=''
         Orth=self.orth
         if Orth:
@@ -304,6 +462,7 @@ def line2wdfts(Line,CorpusOrDic,WithCost=False):
     if CorpusOrDic=='corpus':
         Wd,FtStr=Line.strip().split('\t')
         Fts=tuple(FtStr.split(','))
+        Costs=None
     elif CorpusOrDic=='dic':
         WdFts=Line.strip().split(',')
         Wd=WdFts[0]
@@ -352,13 +511,27 @@ def pick_lines(FP,OrderedLineNums):
                 sys.stdout.write(LiNe)
 
 def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
+#    import pdb
+ #   if os.path.basename(FP)=='names.csv':
+  #      pdb.set_trace()
     ContentsLines=OrderedDict()
+    MSs,Consts=None,myModule.prepare_progressconsts(FP)
     with open(FP,encoding='utf8',errors='replace') as FSr:
         for Cntr,LiNe in enumerate(FSr):
+            if Cntr+1%500==0:
+
+                MSs=myModule.progress_counter(MSs,Cntr,Consts)
             Line=LiNe.strip()
+            if not Line:
+                continue
             FtEls=Line.split(',')
             if FtEls[4] not in Exclude:
-                RelvEls=tuple([ FtEls[Ind-1] for Ind in Colnums ])
+                try:
+                    RelvEls=tuple([ FtEls[Ind] for Ind in Colnums ])
+                except:
+                    print('\ncluster_samefeat_lines: Column number invalid for \n')
+                    print(LiNe+'\n')
+                    sys.exit()
                 if RelvEls in ContentsLines.keys():
                     ContentsLines[RelvEls].append(Line)
                 else:

@@ -13,6 +13,45 @@ sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #answer = input(prompt)
 #t.cancel()
 
+def sort_two_files(FP1,FP2):
+    def initialise_fss(FP1,FP2):
+        FSr1=open(FP1)
+        FSr2=open(FP2)
+        Line1=FSr1.readline()
+        Line2=FSr2.readline()
+        FFS,CFS,FL=(FSr1,FSr2,Line1) if Line1>Line2 else (FSr2,FSr1,Line2)
+        FFS.seek(0); CFS.seek(0)
+        return FFS,CFS,FL
+
+    Out=sys.stdout
+    Fst=True
+    FFS=CFS=True
+    while FFS and CFS:
+        if Fst:
+            Fst=False
+            FFS,CFS,FL=initialise_fss(FP1,FP2)
+
+        else:
+            while FL==CL:
+                Out.write(CL)
+                FL=FFS.readline()
+                CL=CFS.readline()
+            
+            if FL>CL:
+                Out.write(CL)
+            else:
+                Out.write(FL)
+                FL=CL
+                CFS,FFS=FFS,CFS
+        CL=CFS.readline()    
+        
+            
+            
+#FP1='/home/yosato/Dropbox/testfiles/count_ngrams/aaa'
+#FP2='/home/yosato/Dropbox/testfiles/count_ngrams/bbb'
+
+#sort_two_files(FP1,FP2)            
+
 def ngram_lines(FP,N,OutFP=None):
     if not OutFP:
         Out=sys.stdout
@@ -744,9 +783,17 @@ def get_endpos_fs(FS):
 #    return do_something_and_comeback_fs(FS,)
 
 
-def change_stem(FP,Addition):
+def change_stem(FP,Stuff,AddOrRemove='add'):
     StExt=get_stem_ext(FP)
-    return StExt[0]+Addition+'.'+StExt[1]
+    if AddOrRemove=='add':
+        NewFP=StExt[0]+Stuff+'.'+StExt[1]
+    elif AddOrRemove=='remove' or AddOrRemove=='delete':
+        NewFP=StExt[0].replace(Stuff,'')+'.'+StExt[1]
+    else:
+        print('\nAddOrRemove param wrong\n')
+        NewFP=None
+    return NewFP
+        
 
 def indicate_loop_progress(Var,Interval,Message='progress',Increment=1):
     if Var%Interval==0:
@@ -1718,6 +1765,15 @@ def at_least_one_of_chartypes_p(Str,Types,UnivTypes=[]):
         if CharType in Types:
             Bool=True; break
     return Bool
+
+def upto_char(Str,Chars):
+    Substr=''
+    for Char in Str:
+        if Char in Chars:
+            break
+        else:
+            Substr+=Char
+    return Substr
 
 
 def of_chartypes_p(Char,Types,UnivTypes=['ws']):
