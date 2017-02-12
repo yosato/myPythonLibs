@@ -1177,7 +1177,7 @@ def in_ranges(TgtNum,Ranges):
             (Fst,Snd)=Range
             HexP= (type(Fst).__name__ == 'str' and type(Snd).__name__ == 'str' and 
                    len(Fst)==4 and len(Snd)==4 )
-            Cond=((type(Fst).__name__ == 'int' and type(Snd).__name__ == 'int') or
+            Cond=((type(Fst).__name__ == 'int' and type(Fst).__name__ == 'float') and (type(Snd).__name__ == 'int' and type(Snd).__name__ == 'float')) or
                  HexP )
             if not Cond:
                 print('[myModule.in_ranges] format wrong'); exit()
@@ -1714,6 +1714,17 @@ def split_re_inclusive(Str,Delims=r'([!?\n。]+)'):
 ## TEXTPROC
 ####
 
+
+def execute_warn_ifdifferent(Func,Args,ArgInd,Theme):
+    print(Theme)
+    Org=Args[ArgInd]
+    print('original: '+Org)
+    Out=Func(*Args)
+    if Org==Out:
+        print('no change')
+    else:
+        print('after: '+Out)
+    return Out
 
 def identify_chartype(Char):
     return identify_type_char(Char)
