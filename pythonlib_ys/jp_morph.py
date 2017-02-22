@@ -642,7 +642,7 @@ def voicethevoiceable(Kana):
         
         
             
-def identify_dan(Char):
+def identify_dan(Char,InRomaji=False):
     if myModule.identify_type_char(Char)=='hiragana':
         Ind=0
     else:
@@ -651,7 +651,11 @@ def identify_dan(Char):
         if Char in GyoChars:
             for Dan,CandCharPair in Dic.items():
                 if CandCharPair[Ind]==Char:
-                    return Dan
+                    if not InRomaji:
+                        return Dan
+                    else:
+                        return romkan.to_roma(Dan)[0]
+                    
 
 def change_dan(Char,Dan):
     if myModule.identify_type_char(Char)=='hiragana':

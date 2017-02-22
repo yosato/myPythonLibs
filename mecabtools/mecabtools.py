@@ -191,6 +191,7 @@ class MecabWdParse:
             InfType='adj'
         elif self.infpat.startswith('五段'):
             InfType='godan'
+            InfDan=jp_morph(identify_dan(self.infpat.split('・')[1][0],InRomaji=True))
         if InfType=='adj':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
             try:
@@ -203,23 +204,28 @@ class MecabWdParse:
         elif any(self.infpat.startswith(Pat) for Pat in ('サ変','カ変')):
             Stem=self.orth
             Suffix=''
+            
         elif InfType=='godan':
-            if any(self.infform.startswith(Form) for Form in ('連用タ接続','未然特殊','体言接続特殊')):
-                Stem=self.orth
-                Suffix=''
+            Stem=self.orth[:-1]+InfDan
+            
+            if self.infform=='連用タ接続':
+                if any(InfDan==Dan for Dan in ('k', 'g')):
+                    Suffix='i'
+                elif any(InfDan==Dan for Dan in ('t','d','r','w')):
+                    Suffix='t'
+                elif any(InfDan==Dan for Dan in ('m','n',)):
+                    Suffix='n'
+
+            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊')):
+                Stem=self.orth[:-1]+InfDan
+                Suffix='n'
+            elif self.infform.startswith('仮定縮約'):
+                Suffix='e'
+
             else:
-                Stem=self.lemma[:-1]+jp_morph.identify_gyo(self.lemma[-1],InRomaji=True)
+                SuffixPlus=self.orth[len(Stem)-1:]
+                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
                 
-                if Stem.endswith('u'):
-                    Stem=Stem[:-1]+'w'
-                if self.infform.startswith('仮定縮約'):
-                    Suffix='ya'
-                else:
-                    SuffixPlus=self.orth[len(Stem)-1:]
-                    try:
-                        Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
-                    except:
-                        jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
         elif self.infpat.startswith('一段'):
             Stem=self.lemma[:-1]
             Suffix=self.orth[len(Stem):]
