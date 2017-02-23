@@ -654,7 +654,7 @@ def identify_dan(Char,InRomaji=False):
                     if not InRomaji:
                         return Dan
                     else:
-                        return romkan.to_roma(Dan)[0]
+                        return romkan.to_hiragana(Dan)
                     
 
 def change_dan(Char,Dan):

@@ -191,7 +191,7 @@ class MecabWdParse:
             InfType='adj'
         elif self.infpat.startswith('五段'):
             InfType='godan'
-            InfDan=jp_morph(identify_dan(self.infpat.split('・')[1][0],InRomaji=True))
+            InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
         if InfType=='adj':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
             try:
@@ -206,7 +206,7 @@ class MecabWdParse:
             Suffix=''
             
         elif InfType=='godan':
-            Stem=self.orth[:-1]+InfDan
+            Stem=self.orth[:-1]+InfGyo
             
             if self.infform=='連用タ接続':
                 if any(InfDan==Dan for Dan in ('k', 'g')):
@@ -224,7 +224,8 @@ class MecabWdParse:
 
             else:
                 SuffixPlus=self.orth[len(Stem)-1:]
-                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
+                Suffix=jp_morph.identify_dan(SuffixPlus[0])
+#                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
                 
         elif self.infpat.startswith('一段'):
             Stem=self.lemma[:-1]
