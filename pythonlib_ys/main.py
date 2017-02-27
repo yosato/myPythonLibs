@@ -1788,20 +1788,22 @@ def upto_char(Str,Chars):
     return Substr
 
 
-def of_chartypes_p(Char,Types,UnivTypes=['ws']):
+def of_chartypes_p(Char,Types,UnivTypes=['ws'],Exceptions=[]):
+    if Char in Exceptions:
+        return True
     Types.extend(UnivTypes)
     CharType=identify_type_char(Char)
     return CharType in Types
 
-def all_of_types_p(Str,Types,UnivTypes=['ws']):
+def all_of_types_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
     all_of_chartypes_p(Str,Types,UnivTypes=UnivTypes)
 
-def all_of_chartypes_p(Str,Types,UnivTypes=['ws']):
+def all_of_chartypes_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
 
     Bool=True
 
     for Char in Str:
-        if not of_chartypes_p(Char,Types+UnivTypes):
+        if not of_chartypes_p(Char,Types+UnivTypes,Exceptions=Exceptions):
             Bool=False; break
     return Bool
 
