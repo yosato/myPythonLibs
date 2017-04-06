@@ -124,11 +124,14 @@ def mecabfile2mecabsents(MecabFP):
         yield MecabSentParse(MecabWds)
     
 def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=True):
-    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost=WithCost)
+    WithCost=True if WithCost else False
+    WithCost=False if CorpusOrDic=='corpus' else WithCost
+    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost)
     if WithCost:
-        Fts,Costs=FtsCosts
+        Fts,CostStrs=FtsCosts
+        Costs=[int(CostStr) for CostStr in CostStrs]
     else:
-        Fts=FtsCosts;Costs=None
+        Fts=FtsCosts[0];Costs=None
     if len(Fts)>=8:
         Cat=Fts[0]
         MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8],costs=Costs)
@@ -216,13 +219,13 @@ class MecabWdParse:
         Irregulars=('サ変','カ変','特殊・タ')
         def determine_inftype(self):
             Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat)  ]
-            if Pats:
+            if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
+                InfType='adj'
+                InfGyo=None
+            elif Pats:
                 InfType=Pats[0]
                 InfGyo=None
             
-            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ'))):
-                InfType='adj'
-                InfGyo=None
             elif self.infpat.startswith('五段'):
                 InfType='godan'
                 InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
@@ -235,11 +238,11 @@ class MecabWdParse:
             return InfType,InfGyo
         
         def handle_irregulars(self,Type):
-            Table= { 'サ変':('s',{'未然':'i','連用':'i','基本':'uる','仮定':'uれ','命令':'iろ'}),
-                     'カ変':('k',{'未然':'o','連用':'i','基本':'uる','仮定':'uれ','命令':'oい'}),
-                     '特殊・タ':('た',{'未然':'ろ','基本':'','仮定':'ら'}) }
+            Table= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
+                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
+                     '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}) }
             Stem,Suffixes=Table[Type]
-            Suffix=Suffixes[self.infform[:2]]
+            Suffix=Suffixes[self.infform] if Type!='サ変' else Suffixes[self.infform]
             return Stem,Suffix
            
         InfType,InfGyo=determine_inftype(self)
@@ -248,7 +251,7 @@ class MecabWdParse:
             Stem,Suffix=handle_irregulars(self,InfType)
         
         elif InfType=='adj':
-            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
+            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ','けりゃ')
             try:
                 Suffix=next(Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) )
                 Stem=re.sub(r'%s$'%Suffix,'',self.orth)
@@ -257,6 +260,8 @@ class MecabWdParse:
                 Stem=self.orth
             
         elif InfType=='godan':
+            if self.infform.startswith('仮定縮約'):
+                self.orth=self.orth[:-1]
             Stem=self.orth[:-1]+InfGyo
             
             if self.infform=='連用タ接続':
@@ -264,19 +269,21 @@ class MecabWdParse:
                     Suffix='i'
                 elif any(InfGyo==Dan for Dan in ('t','d','r','w')):
                     Suffix='t'
-                elif any(InfGyo==Dan for Dan in ('m','n',)):
+                elif any(InfGyo==Dan for Dan in ('m','n','b',)):
                     Suffix='n'
 
             elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊')):
                 Stem=self.orth[:-1]+InfGyo
                 Suffix='n'
             elif self.infform.startswith('仮定縮約'):
-                Suffix='e'
+                Suffix='ey'
 
             else:
                 SuffixPlus=self.orth[len(Stem)-1:]
                 Suffix=jp_morph.identify_dan(SuffixPlus[0])
 #                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
+
+
                 
         elif InfType=='ichidan':
             Stem=self.lemma[:-1]
@@ -518,8 +525,9 @@ class MecabWdParse:
 
 def line2wdfts(Line,CorpusOrDic,WithCost=False):
     if CorpusOrDic=='corpus':
-        Wd,FtStr=Line.strip().split('\t')
-        Fts=tuple(FtStr.split(','))
+        WdFtStrPlusNote=Line.strip().split('\t')
+        Wd=WdFtStrPlusNote[0]
+        Fts=tuple(WdFtStrPlusNote[1].split(','))
         Costs=None
     elif CorpusOrDic=='dic':
         WdFts=Line.strip().split(',')

@@ -655,7 +655,8 @@ def identify_dan(Char,InRomaji=False):
                         return Dan
                     else:
                         return romkan.to_hiragana(Dan)
-                    
+def all_kana_p(Str):
+    return all(myModule.is_kana(Char) for Char in Str)
 
 def change_dan(Char,Dan):
     if myModule.identify_type_char(Char)=='hiragana':
