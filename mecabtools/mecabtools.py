@@ -210,7 +210,9 @@ class MecabWdParse:
     def divide_stem_suffix_radical(self,OutputObject=True):
         IrregTable= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
-                    '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}),
+                    '特殊・タ':('た',{'未然形':'ろ','連用タ接続':'t','基本形':'','仮定形':'ら'}),
+                      '特殊・ヤ':('や',{'未然形':'ろ','連用タ接続':'t','基本形':'','体言接続':'な','仮定形':'ら'}),
+                      '特殊・ダ':('だ',{'未然形':'ろ','連用タ接続':'t','連用形':'で','基本形':'','仮定形':'ら','体言接続':'な'}),
                       '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u'}),
                       '特殊・デス':('でs',{'連用形':'i','未然ウ接続':'iy','基本形':'u'})
             }
@@ -227,11 +229,11 @@ class MecabWdParse:
             elif self.infpat.startswith('五段'):
                 InfType='godan'
                 InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
-            elif self.infpat=='一段' or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
+            elif self.infpat.startswith('一段') or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
                 InfType='ichidan'
                 InfGyo=None
             else:
-                InfType='ichidan'
+                InfType=self.infpat
                 InfGyo=None
             return InfType,InfGyo
         
@@ -278,7 +280,10 @@ class MecabWdParse:
                 Suffix=jp_morph.identify_dan(SuffixPlus[0])
                 
         elif InfType=='ichidan':
-            Stem=self.lemma[:-1]
+            if self.lemma=='る':
+                Stem=''
+            else:    
+                Stem=self.lemma[:-1]
             Suffix=self.orth[len(Stem):]
         else:
             sys.stderr.write('\nERROR for'+self.get_mecabline()+'\n')
