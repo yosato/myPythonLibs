@@ -17,7 +17,8 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
-DefIndsFts={0:'orth',1:'cat',2:'subcat',3:'subcat2',4:'sem',5:'infpat',6:'infform',7:'lemma',8:'reading',9:'pronunciation'}
+DefFts=['orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation']
+DefIndsFts={Ind:Ft for (Ind,Ft) in enumerate(DefFts)}
 DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
 DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
 # the reverse list from ft to ind
@@ -37,6 +38,15 @@ def radicalise_mecabline(MecabCorpusLiNe):
     else:
         return radicalise_mecabwd(MWd)
 
+def generate_sentchunks(MecabFP):
+    FSr=open(MecabFP)
+    Chunk=[]
+    for LiNe in FSr:
+        if LiNe=='EOS\n':
+            yield Chunk
+            Chunk=[]
+        else:
+            Chunk.append(LiNe.strip())
 
 def get_mecablines_wds(MWds):
     Strs=''
@@ -87,16 +97,22 @@ def fts2inds(Fts,CorpusOrDic='dic'):
         
     return sorted([Ind for (Ind,Ft) in Mapping.items() if Ft in Fts])
 
-def pick_feats_fromline(Line,RelvFts,IndsFts=None,CorpusOrDic='corpus'):
+def pick_feats_fromline(Line,RelvFtNames,Fts=None,CorpusOrDic='corpus'):
+    from bidict import bidict
     if not Line.strip():
         print('empty line encountered')
         return None
-    if not IndsFts:
+    if Fts:
+        IndsFts=bidict({Ind:Ft for (Ind,Ft) in enumerate(Fts)})
+    else:
         IndsFts=DefIndsFts if CorpusOrDic=='corpus' else DefLexIndsFts
+        IndsFts=bidict(IndsFts)
     Line=Line.strip()
     LineEls=Line.replace('\t',',').split(',')
+    assert(len(LineEls)==len(Fts))
     FtCntInLine=len(LineEls)
-    RelvInds=fts2inds(RelvFts,CorpusOrDic=CorpusOrDic)
+    RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
+    #RelvInds=fts2inds(RelvFtNames,Fts,CorpusOrDic=CorpusOrDic)
     Pairs=[]
     for Ind in RelvInds:
         if Ind+1>FtCntInLine:
@@ -115,29 +131,6 @@ def file2delimchunks(FP,Delim):
             Lines=[]
         else:
             Lines.append(Line)
-
-def mecabfile2mecabsents(MecabFP):
-    #MecabWds=[]
-    ChunksG=file2delimchunks(MecabFP,'EOS')
-    for Chunk in ChunksG:
-        MecabWds=[mecabline2mecabwd(Line,'corpus') for Line in Chunk]
-        yield MecabSentParse(MecabWds)
-    
-def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=True):
-    WithCost=True if WithCost else False
-    WithCost=False if CorpusOrDic=='corpus' else WithCost
-    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost)
-    if WithCost:
-        Fts,CostStrs=FtsCosts
-        Costs=[int(CostStr) for CostStr in CostStrs]
-    else:
-        Fts=FtsCosts[0];Costs=None
-    if len(Fts)>=8:
-        Cat=Fts[0]
-        MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8],costs=Costs)
-    else:
-        MecabWd=MecabWdParse(orth=Wd,cat=Fts[0],subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma='*',infpat=Fts[4],infform='*',reading='*',pronunciation='*',costs=Costs)
-    return MecabWd
 
 def search_feat(MWds,Ft,Val,FstOnly=False):
     Fnd=[]
@@ -167,16 +160,15 @@ class MecabSentParse:
         return Str
     
 class MecabWdParse:
-    def __init__(self,**AVPairs):
-        Fts=('orth','lemma','sem','cat','subcat','subcat2','infpat','infform','reading','pronunciation')
-        ProtoTypeFts={ Ft:'*' for Ft in Fts }
-        Fts=AVPairs.keys()
-        if not ('orth' in Fts or 'lemma' in Fts):
-            sys.exit('you must have orth and lemma)')
-        else:
-            self.__dict__=ProtoTypeFts
-            for Ft,Val in AVPairs.items():
-                self.__dict__[Ft]=Val
+    def __init__(self,*AVPairs,Costs=None):
+        self.inherentatts=[A for (A,V) in AVPairs]
+        self.costs=Costs
+        for Ft,Val in AVPairs:
+            self.__dict__[Ft]=Val
+
+        OblCats=('orth','lemma','cat')
+        if not all(OblCat in self.__dict__.keys() for OblCat in OblCats):
+            sys.exit('all obligatory categories must be present')
 
         self.orthtypes=self.get_orthtypes()
 
@@ -187,8 +179,8 @@ class MecabWdParse:
         self.count=None
         self.poss=None
         self.lexpos=None
-        self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
-
+        if 'infpat' in self.__dict__.keys():
+            self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
     def set_poss(self,Poss):
         self.poss=Poss
         self.count=len(Poss)
@@ -215,10 +207,15 @@ class MecabWdParse:
             PrvType=CurType
         return Types
 
-    def divide_stem_suffix_radical(self):
-        Irregulars=('サ変','カ変','特殊・タ')
+    def divide_stem_suffix_radical(self,OutputObject=True):
+        IrregTable= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
+                    'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
+                    '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}),
+                    '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u'})
+            }
+        Irregulars=set(IrregTable.keys())
         def determine_inftype(self):
-            Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat)  ]
+            Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat) ]
             if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
                 InfType='adj'
                 InfGyo=None
@@ -238,10 +235,7 @@ class MecabWdParse:
             return InfType,InfGyo
         
         def handle_irregulars(self,Type):
-            Table= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
-                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
-                     '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}) }
-            Stem,Suffixes=Table[Type]
+            Stem,Suffixes=IrregTable[Type]
             Suffix=Suffixes[self.infform] if Type!='サ変' else Suffixes[self.infform]
             return Stem,Suffix
            
@@ -264,7 +258,7 @@ class MecabWdParse:
                 self.orth=self.orth[:-1]
             Stem=self.orth[:-1]+InfGyo
             
-            if self.infform=='連用タ接続':
+            if self.infform.startswith('連用タ接続'):
                 if any(InfGyo==Dan for Dan in ('k', 'g')):
                     Suffix='i'
                 elif any(InfGyo==Dan for Dan in ('t','d','r','w')):
@@ -272,7 +266,7 @@ class MecabWdParse:
                 elif any(InfGyo==Dan for Dan in ('m','n','b',)):
                     Suffix='n'
 
-            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊')):
+            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊','基本形・撥音便・縮約形')):
                 Stem=self.orth[:-1]+InfGyo
                 Suffix='n'
             elif self.infform.startswith('仮定縮約'):
@@ -281,9 +275,6 @@ class MecabWdParse:
             else:
                 SuffixPlus=self.orth[len(Stem)-1:]
                 Suffix=jp_morph.identify_dan(SuffixPlus[0])
-#                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
-
-
                 
         elif InfType=='ichidan':
             Stem=self.lemma[:-1]
@@ -293,6 +284,8 @@ class MecabWdParse:
             sys.exit('ERROR: no category to classify, aborting\n')
         
         self.stem=Stem
+        if Suffix is None:
+            sys.exit('\nsuffix should not be none\n')
         self.suffix=Suffix
 
         if not Suffix:
@@ -301,8 +294,16 @@ class MecabWdParse:
             StemReading=self.reading[:-len(self.suffix)]
             if re.match(r'^.*[a-z]$',self.stem):
                 StemReading=StemReading+self.stem[-1]
+        if OutputObject:
+            Stem=self.get_variant([('orth',Stem),('infform','語幹'),('reading',StemReading),('pronunciation',StemReading)])
+            
+
+        if OutputObject:
+            KatakanaSuffix=romkan.to_katakana(Suffix)
+            Suffix=self.get_prototype(FtsVals=[('orth',Suffix),('lemma',Suffix), ('infform',self.infform), ('cat','活用語尾'), ('pronunciation',KatakanaSuffix)])
         
-        return (Stem,StemReading),Suffix
+        return Stem,Suffix
+
     
     def divide_stem_suffix(self):
         if self.cat=='動詞':
@@ -372,11 +373,20 @@ class MecabWdParse:
         else:
             self.__dict__[Ft]=Val
 
-    def get_variant(self,FtValPairs):
+    def get_variant(self,FtsVals):
+        FtsVals=dict(FtsVals)
         SelfCopy=copy.deepcopy(self)
-        for Ft,Val in FtValPairs:
+        for Ft,Val in FtsVals.items():
             SelfCopy.__dict__[Ft]=Val
         return SelfCopy
+
+    def get_prototype(self,FtsVals={}):
+        FtsVals=dict(FtsVals)
+        AVPairs=[(Att,'*') for Att in self.inherentatts]
+        ProtoType=MecabWdParse(*AVPairs)
+        for Ft,Val in FtsVals.items():
+            ProtoType.__dict__[Ft]=Val
+        return ProtoType
             
     def construct_lexeme(self,AVDic):
         Cat=AVDic['cat'];Lemma=AVDic['lemma']
@@ -499,15 +509,17 @@ class MecabWdParse:
     def get_mecabline(self,CorpusOrDic='corpus'):
         if CorpusOrDic=='dic':
             return self.get_mecabdicline()
-        Str=''
+        
         Orth=self.orth
-        if Orth:
-            Str=Orth
-            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
-            FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
-            Rest=','.join(FtsNonEmpty)
-            Str=Str+'\t'+Rest
-        return Str
+        FtStrs=[]
+        for Ft in self.inherentatts[1:]:
+            FtStrs.append(str(self.__dict__[Ft]))
+        FtStr=','.join(FtStrs)
+#            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
+ #           FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
+  #          Rest=','.join(FtsNonEmpty)
+   #         Str=Str+'\t'+Rest
+        return '\t'.join([Orth,FtStr])
     def get_mecabdicline(self):
         Str=''
         Orth=self.orth
@@ -522,22 +534,38 @@ class MecabWdParse:
                 Str+=','+','.join([str(Cost) for Cost in self.costs])+','+Rest
         return Str
 
+# utility functions to render lines to objects
+def mecabfile2mecabsents(MecabFP):
+    ChunksG=file2delimchunks(MecabFP,'EOS')
+    for Chunk in ChunksG:
+        MecabWds=[mecabline2mecabwd(Line,'corpus') for Line in Chunk]
+        yield MecabSentParse(MecabWds)
+    
+def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
+    WithCost=True if WithCost else False
+    WithCost=False if CorpusOrDic=='corpus' else WithCost
+    FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
+    return MecabWdParse(*FtsVals,Costs=Costs)
 
-def line2wdfts(Line,CorpusOrDic,WithCost=False):
+def line2wdfts(Line,CorpusOrDic='corpus',Fts=None,WithCost=False):
+    Fts=DefFts if not Fts else Fts
     if CorpusOrDic=='corpus':
         WdFtStrPlusNote=Line.strip().split('\t')
         Wd=WdFtStrPlusNote[0]
-        Fts=tuple(WdFtStrPlusNote[1].split(','))
+        Vals=tuple([Wd]+WdFtStrPlusNote[1].split(','))
         Costs=None
     elif CorpusOrDic=='dic':
         WdFts=Line.strip().split(',')
         Wd=WdFts[0]
-        Fts=tuple(WdFts[4:])
+        Vals=tuple([Wd]+WdFts[4:])
         if WithCost:
             Costs=tuple(WdFts[1:4])
         else:
             Costs=None
-    return Wd,(Fts,Costs)
+    assert(len(Fts)==len(Vals))
+    FtsVals=list(zip(Fts,Vals))
+#    FtsVals.append('costs',Costs))
+    return FtsVals,Costs
 
 def eos_p(Line):
     return Line.strip()=='EOS'

@@ -13,6 +13,10 @@ sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #answer = input(prompt)
 #t.cancel()
 
+def list2inddict(L):
+    return {Ind:El for (Ind,El) in enumerate(L)}
+
+
 def sort_two_files(FP1,FP2):
     def initialise_fss(FP1,FP2):
         FSr1=open(FP1)
