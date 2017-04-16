@@ -211,7 +211,8 @@ class MecabWdParse:
         IrregTable= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
                     '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}),
-                    '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u'})
+                      '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u'}),
+                      '特殊・デス':('でs',{'連用形':'i','未然ウ接続':'iy','基本形':'u'})
             }
         Irregulars=set(IrregTable.keys())
         def determine_inftype(self):
@@ -559,7 +560,7 @@ def line2wdfts(Line,CorpusOrDic='corpus',Fts=None,WithCost=False):
         Wd=WdFts[0]
         Vals=tuple([Wd]+WdFts[4:])
         if WithCost:
-            Costs=tuple(WdFts[1:4])
+            Costs=tuple([int(Str) for Str in WdFts[1:4]])
         else:
             Costs=None
     assert(len(Fts)==len(Vals))
