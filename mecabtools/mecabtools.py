@@ -207,7 +207,7 @@ class MecabWdParse:
             PrvType=CurType
         return Types
 
-    def divide_stem_suffix_radical(self,OutputObject=True):
+    def divide_stem_suffix_radical(self,OutputObject=True,StrictP=False):
         IrregTable= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
                     '特殊・タ':('た',{'未然形':'ろ','連用タ接続':'t','基本形':'','仮定形':'ら'}),
@@ -233,19 +233,26 @@ class MecabWdParse:
                 InfType='ichidan'
                 InfGyo=None
             else:
-                InfType=self.infpat
+                InfType=None
                 InfGyo=None
             return InfType,InfGyo
         
         def handle_irregulars(self,Type):
             Stem,Suffixes=IrregTable[Type]
-            Suffix=Suffixes[self.infform] if Type!='サ変' else Suffixes[self.infform]
+            if self.infform not in Suffixes.keys():
+                print('\n'+self.infform+' not found for '+Type+'\n')
+                Suffix=None
+            else:
+                Suffix=Suffixes[self.infform] if Type!='サ変' else Suffixes[self.infform]
             return Stem,Suffix
            
         InfType,InfGyo=determine_inftype(self)
 
         if any(InfType==Type for Type in Irregulars):
             Stem,Suffix=handle_irregulars(self,InfType)
+        elif InfType is None and not StrictP:
+            print('\nCategorisation of\n'+repr(self.__dict__)+'\nfailed\n')
+            return self
         
         elif InfType=='adj':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ','けりゃ')
@@ -290,8 +297,6 @@ class MecabWdParse:
             sys.exit('ERROR: no category to classify, aborting\n')
         
         self.stem=Stem
-        if Suffix is None:
-            sys.exit('\nsuffix should not be none\n')
         self.suffix=Suffix
 
         if not Suffix:
