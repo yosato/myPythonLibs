@@ -46,7 +46,7 @@ def generate_sentchunks(MecabFP):
             yield Chunk
             Chunk=[]
         else:
-            Chunk.append(LiNe.strip())
+            Chunk.append(LiNe.rstrip())
 
 def get_mecablines_wds(MWds):
     Strs=''
@@ -107,9 +107,12 @@ def pick_feats_fromline(Line,RelvFtNames,Fts=None,CorpusOrDic='corpus'):
     else:
         IndsFts=DefIndsFts if CorpusOrDic=='corpus' else DefLexIndsFts
         IndsFts=bidict(IndsFts)
-    Line=Line.strip()
+    Line=Line.rstrip()
+    if Line.startswith(','):
+        Line=Line.replace(',','、',1)
     LineEls=Line.replace('\t',',').split(',')
-    assert(len(LineEls)==len(Fts))
+    FtCnt=len(LineEls)
+    assert(FtCnt==len(Fts) or FtCnt==len(Fts)-2)
     FtCntInLine=len(LineEls)
     RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
     #RelvInds=fts2inds(RelvFtNames,Fts,CorpusOrDic=CorpusOrDic)
@@ -232,6 +235,9 @@ class MecabWdParse:
             elif self.infpat.startswith('一段') or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
                 InfType='ichidan'
                 InfGyo=None
+            elif self.infpat == '特殊・タんや':
+                InfType='fixed'
+                InfGyo=None
             else:
                 InfType=None
                 InfGyo=None
@@ -250,6 +256,9 @@ class MecabWdParse:
 
         if any(InfType==Type for Type in Irregulars):
             Stem,Suffix=handle_irregulars(self,InfType)
+        elif InfType=='fixed':
+            Stem=self.orth
+            Suffix=''
         elif InfType is None and not StrictP:
             print('\nCategorisation of\n'+repr(self.__dict__)+'\nfailed\n')
             return self
