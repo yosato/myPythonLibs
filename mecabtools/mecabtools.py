@@ -1,6 +1,5 @@
 import re, imp, os, sys, time, shutil,subprocess,collections, copy
 from difflib import SequenceMatcher
-sys.path.append('./../myPythonLibs')
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
 import romkan
