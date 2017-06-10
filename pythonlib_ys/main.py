@@ -3,7 +3,7 @@ import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,in
 from collections import abc as abc
 
 from pdb import set_trace
-sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
+
 #from stringproc import *
 
 #timeout = 10

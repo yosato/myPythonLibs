@@ -3,7 +3,7 @@ from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
 import romkan
-import jp_morph
+from pythonlib_ys import jp_morph
 imp.reload(myModule)
 imp.reload(jp_morph)
 try:
