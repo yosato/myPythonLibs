@@ -234,7 +234,7 @@ class MecabWdParse:
             elif self.infpat.startswith('一段') or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
                 InfType='ichidan'
                 InfGyo=None
-            elif self.infpat == '特殊・タんや':
+            elif self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや':
                 InfType='fixed'
                 InfGyo=None
             else:
