@@ -287,7 +287,7 @@ class MecabWdParse:
                 elif any(InfGyo==Dan for Dan in ('m','n','b',)):
                     Suffix='n'
 
-            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊','基本形・撥音便・縮約形')):
+            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊','基本形・撥音便')):
                 Stem=self.orth[:-1]+InfGyo
                 Suffix='n'
             elif self.infform.startswith('仮定縮約'):
