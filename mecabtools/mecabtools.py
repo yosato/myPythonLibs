@@ -221,7 +221,13 @@ class MecabWdParse:
         Irregulars=set(IrregTable.keys())
         def determine_inftype(self):
             Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat) ]
-            if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
+
+            if self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや':
+                InfType='fixed'
+                InfGyo=None
+
+            
+            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
                 InfType='adj'
                 InfGyo=None
             elif Pats:
@@ -233,9 +239,6 @@ class MecabWdParse:
                 InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
             elif self.infpat.startswith('一段') or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
                 InfType='ichidan'
-                InfGyo=None
-            elif self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや':
-                InfType='fixed'
                 InfGyo=None
             else:
                 InfType=None
