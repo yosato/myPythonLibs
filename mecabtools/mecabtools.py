@@ -225,7 +225,7 @@ class MecabWdParse:
         def determine_inftype(self):
             Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat) ]
 
-            if self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや' or self.infpat == '文語・べし':
+            if self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや' or self.infpat == '文語・ベシ':
                 InfType='fixed'
                 InfGyo=None
 
