@@ -1460,16 +1460,26 @@ def merge_countdics0(CumDic,DicToAdded):
 
 def merge_countdics(Dic1,Dic2):
     NewDic={}
+    AcceptedTypes=['set','list','int']
     Only1=set(Dic1.keys())-set(Dic2.keys())
     Only2=set(Dic2.keys())-set(Dic1.keys())
     for Key,Cnt in Dic1.items():
         if Key in Only1:
             NewDic[Key]=Dic1[Key]
         else:
-            NewDic[Key]=Dic1[Key]+Dic2[Key]
+            if type(Dic1[Key])!=type(Dic2[Key]):
+                sys.exit('the two types must be the same')
+            if all(type(Dic1[Key]).__name__ not in Type for Type in ['set','int','list']):
+                sys.exit('the value has to be one of: set, int or list')
+            if type(Dic1[Key]).__name__=='set': 
+                NewDic[Key]=Dic1[Key].union(Dic2[Key])
+            else:
+                NewDic[Key]=Dic1[Key]+Dic2[Key]
     for Key in Only2:
         NewDic[Key]=Dic2[Key]
-    return NewDic            
+    return NewDic
+
+
             
 
 
