@@ -1,5 +1,7 @@
 import copy,sys,imp,re,os,random,subprocess,inspect,functools,itertools
 import romkan
+from pdb import set_trace
+from collections import defaultdict
 # some globals
 HomeDir=os.getenv('HOME')
 sys.path.append(HomeDir+'/myProgs/python')
@@ -161,14 +163,82 @@ GojuonStrH='あいうえお\nかきくけこ\nさしすせそ\nたちつてと\n
 GojuonStrK='アイウエオ\nカキクケコ\nサシスセソ\nタチツテト\nナニヌネノ\nハヒフヘホ\nマミムメモ\nヤイユエヨ\nラリルレロ\nワイウエヲ\nガギグゲゴ\nザジズゼゾ\nダヂヅデド\nバビブベボ\nパピプペポ\nャィュェョ\nァィゥェォ'
 GojuonStrR='aiueo\nkakikukeko\nsasisuseso\tatituteto\naninuneno\nhahihuheho\nmamimumemo\nyayiyuyeyo\nwawiwuwewo\ngagigugego\nzazizuzezo\ndadidudedo\nbabibubebo\npapipupepo\nyayiyuyeyo\naiueo'
 
-GojuonDic={}
+GojuonDic={'んン':{'N':('ん','ン')},'っッ':{'t':('っ','ッ')}}
+
 for GyoStrPair in zip(GojuonStrH.split('\n'),GojuonStrK.split('\n')):
     GyoDic={}
 
     GyoDic.update([('a',(GyoStrPair[0][0],GyoStrPair[1][0])),('i',(GyoStrPair[0][1],GyoStrPair[1][1])),('u',(GyoStrPair[0][2],GyoStrPair[1][2])),('e',(GyoStrPair[0][3],GyoStrPair[1][3])),('o',(GyoStrPair[0][4],GyoStrPair[1][4]))])
-    
+
     GojuonDic[GyoStrPair[0]+GyoStrPair[1]]=GyoDic
 
+
+
+def identify_dan(Char,InRomaji=False):
+    if myModule.identify_type_char(Char)=='hiragana':
+        Ind=0
+    else:
+        Ind=1
+    for GyoChars,Dic in GojuonDic.items():
+        if Char in GyoChars:
+            for Dan,CandCharPair in Dic.items():
+                if CandCharPair[Ind]==Char:
+                    if not InRomaji:
+                        return Dan
+                    else:
+                        return romkan.to_hiragana(Dan)
+
+def change_dan(Char,Dan):
+    if myModule.identify_type_char(Char)=='hiragana':
+        Ind=0
+    else:
+        Ind=1
+    for Chars in GojuonDic.keys():
+        if Char in Chars:
+            return GojuonDic[Chars][Dan][Ind]
+
+                    
+
+def identify_gyo(Kana,InRomaji=False):
+    Dan=identify_dan(Kana)
+    if Dan in ('N','t'):
+        Gyo=Dan
+    elif Dan=='a':
+        Gyo=Kana
+    else:
+        Gyo=change_dan(Kana,'a')
+    if InRomaji:
+        Gyo=romkan.to_roma(Kana)[0]
+        
+    return Gyo
+
+set_trace()
+    
+class Syllable:
+    def __init__(self,Orth):
+        self.orth=Orth
+        self.dan=identify_dan(Orth) if len(Orth)==1 else identify_dan(Orth[-1])
+        self.gyo=identify_gyo(Orth) if len(Orth)==1 else identify_gyo(Orth[0])
+        self.voiced=True if self.gyo in ('ば','が','ざ','だ','ぱ') else False
+        self.palatalised=True if len(Orth)==2 else False
+    def feat_strs(self):
+        return [str(self.dan),str(self.gyo),repr(self.voiced),repr(self.palatalised)]
+
+GyoDicH=defaultdict(list)
+
+for DanDic in GojuonDic.values():
+    for (Gyo,HK) in DanDic.items():
+        GyoDicH[Gyo].append(HK[0])
+
+            
+Pals=[]
+for IDanChar in GyoDicH['i']:
+    if identify_dan(IDanChar) not in ('y','a'):
+        for V in ('ゃ','ゅ','ょ'):
+            Pals.append(IDanChar+V)
+    
+    
+Syllables=[Syllable(Orth) for Orth in list(GojuonStrH)]+[Syllable(Orth) for Orth in Pals]+[Syllable('ん'),Syllable('っ')]
 
 
 class MecabSentParse:
@@ -610,17 +680,6 @@ def render_kana(Wd,WhichKana='hiragana',Strict=False):
 
 
 
-def identify_gyo(Kana,InRomaji=False):
-    Dan=identify_dan(Kana)
-    if Dan=='a':
-        Gyo=Kana
-    else:
-        Gyo=change_dan(Kana,'a')
-    if InRomaji:
-        Gyo=romkan.to_roma(Kana)[0]
-        
-    return Gyo
-
 def voice_first_char(Wd):
     if ' ' in Wd:
         exit('there should not be a space in the str')
@@ -641,31 +700,9 @@ def voicethevoiceable(Kana):
         return None
         
         
-            
-def identify_dan(Char,InRomaji=False):
-    if myModule.identify_type_char(Char)=='hiragana':
-        Ind=0
-    else:
-        Ind=1
-    for GyoChars,Dic in GojuonDic.items():
-        if Char in GyoChars:
-            for Dan,CandCharPair in Dic.items():
-                if CandCharPair[Ind]==Char:
-                    if not InRomaji:
-                        return Dan
-                    else:
-                        return romkan.to_hiragana(Dan)
+
 def all_kana_p(Str):
     return all(myModule.is_kana(Char) for Char in Str)
-
-def change_dan(Char,Dan):
-    if myModule.identify_type_char(Char)=='hiragana':
-        Ind=0
-    else:
-        Ind=1
-    for Chars in GojuonDic.keys():
-        if Char in Chars:
-            return GojuonDic[Chars][Dan][Ind]
 
 def kana_fuzzy_match(Char1,Char2):
     if Char1==Char2 or myModule.kana2kana(Char1)==Char2:
