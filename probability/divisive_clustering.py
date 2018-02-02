@@ -1,47 +1,83 @@
-import numpy
+import copy
+from itertools import combinations
 
-def main0(ClusterR,UpToN=None):
-    D=1;Fst=True
+def main0(ClusterR,distFunc,UpToN=None):
+    Clusters=[]
+    Fst=True
     if UpToN is None:
         IterCnt=len(ClusterR)-1
     else:
         IterCnt=UpToN+1
-
+    DiamA=0;DiamB=0;ClusterB=[]
     while IterCnt:
         if Fst:
             Fst=False
         else:
-            ClusterR=ClusterA if DiamA>DiamB else ClusterB
-        (ClusterA,DiamA),(ClusterB,DiamB)=split_cluster(ClusterR)
+            if len(ClusterA)==1 or len(ClusterB)==1:
+                (ClusterR,RmInd)=(ClusterB,-2) if len(ClusterA)==1 else (ClusterA,-1)
+            else:
+                ClusterR,RmInd=(ClusterA,-1) if DiamA>DiamB else (ClusterB,-2)
+            del Clusters[RmInd]
+        (ClusterA,DiamA),(ClusterB,DiamB)=split_cluster(ClusterR,distFunc)
+        Clusters.append(ClusterA)
+        Clusters.append(ClusterB)
+        
         IterCnt=-1
-
+    return Clusters
 
 def split_cluster(ClusterR,distFunc):
-    ClusterA=ClusterR
-    ClusterB=set()
+    ClusterB=[]
     D=1
-    PrvD=inf
-    while D>0:
-        for El in ClusterR:
-            D=dist_clusters(El,distFunc,ClusterA,ClusterB)
-            MaxSoFar=max(D,PrevD)
-    return (ClusterA,DiamA),(ClusterB,DiamB)
+    while D>=0:
+        PrvD=0
+        for Cntr,El in enumerate(ClusterR):
+            D,DiamA,DiamB=dist_clusters(El,distFunc,ClusterR,ClusterB)
+            if D>PrvD:
+                MaxEl=El
+                MaxDiamA=DiamA
+                MaxDiamB=DiamB
+                PrvD=D
+        print(str(MaxEl)+' chosen')
+        ClusterR.remove(MaxEl)
+        ClusterB.append(MaxEl)
+        print(str(len(ClusterR)))
+        print(str(len(ClusterB)))
+    return (ClusterR,MaxDiamA),(ClusterB,MaxDiamB)
     
-def dist_clusters(TgtEl,distFunc,ClusterA,ClusterB):
-    ClusterAMinusTgt=ClusterA-{TgtEl}
-    return numpy.mean(ClusterAMinusTgt)-numpy.mean(ClusterB)
+def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg):
+    ClusterAMinusTgt=copy.copy(ClusterAOrg)
+    ClusterB=copy.copy(ClusterBOrg)
+    ClusterAMinusTgt.remove(TgtEl)
+    LenA=len(ClusterAMinusTgt);LenB=len(ClusterB)
+    DistsA=all_dists(distFunc,ClusterAMinusTgt)
+    DistsB=all_dists(distFunc,ClusterB)
+    D=(sum(DistsA)/LenA-1)-(0 if not ClusterB else (sum(DistsB)/LenB-1))
+    DiamA=max(DistsA)
+    DiamB=0 if len(ClusterB)<=1 else max(DistsB)
+    return D,DiamA,DiamB
 
+def all_dists(distFunc,Set):
+    Return=[]
+    for Comb in combinations(Set,2):
+        Return.append(distFunc(Comb[0],Comb[1]))
+        #yield distFunc(Comb[0],Comb[1])
+    return Return
+                   
 def main():
     import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('-f','--data-file',required=True)
     Psr.add_argument('--numerical',action='store_true')
+    Psr.add_argument('--up-to-n',type=int)
+    Psr.add_argument('-d','--dist-func')
     Args=Psr.parse_args()
+    if Args.dist_func is None:
+        Args.dist_func=lambda A,B: abs(A-B)
     with open(Args.data_file) as FSr:
-        ClusterR=FSr.read().split()
+        ClusterR=set(FSr.read().split())
     if Args.numerical:
         ClusterR=[float(El) for El in ClusterR]
-    main0(ClusterR)
+    main0(ClusterR,Args.dist_func,Args.up_to_n)
 
 
 
