@@ -9,8 +9,9 @@ def main0(ClusterR,distFunc,UpToN=None):
         UpToN=MaxClusterCnt
     elif UpToN>MaxClusterCnt:
         sys.exit('specified count exceeds maximum')
-    DiamA=0;DiamB=0;ClusterB=[]
-    while UpToN<len(Clusters):
+    DiamA=0;DiamB=0;ClusterB=[];Cntr=0
+    while len(Clusters)<=UpToN:
+        Cntr+=1
         if Fst:
             Fst=False
         else:
@@ -23,7 +24,6 @@ def main0(ClusterR,distFunc,UpToN=None):
         Clusters.append(ClusterA)
         Clusters.append(ClusterB)
         
-        IterCnt=IterCnt-1
     return Clusters
 
 def split_cluster(ClusterR,distFunc):
