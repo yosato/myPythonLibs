@@ -15,16 +15,18 @@ def main0(ClusterR,distFunc,UpToN=None):
         if Fst:
             Fst=False
         else:
-            if len(ClusterA)==1 or len(ClusterB)==1:
-                (ClusterR,RmInd)=(ClusterB,-2) if len(ClusterA)==1 else (ClusterA,-1)
-            else:
-                ClusterR,RmInd=(ClusterA,-1) if DiamA>DiamB else (ClusterB,-2)
-            del Clusters[RmInd]
+            MaxDiam=-float('inf')
+            for (Ind,(_,Diam)) in enumerate(Clusters):
+                if Diam>MaxDiam:
+                    MaxDiam=Diam;MaxInd=Ind
+            del Clusters[MaxInd]
         (ClusterA,DiamA),(ClusterB,DiamB)=split_cluster(ClusterR,distFunc)
-        Clusters.append(ClusterA)
-        Clusters.append(ClusterB)
+        Clusters.append((ClusterA,DiamA,))
+        Clusters.append((ClusterB,DiamB,))
         
     return Clusters
+
+    
 
 def split_cluster(ClusterR,distFunc):
     if len(ClusterR)==2:
