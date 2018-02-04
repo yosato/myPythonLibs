@@ -212,7 +212,7 @@ def identify_gyo(Kana,InRomaji=False):
         
     return Gyo
 
-set_trace()
+
     
 class Syllable:
     def __init__(self,Orth):

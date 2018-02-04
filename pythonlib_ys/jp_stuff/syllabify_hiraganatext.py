@@ -25,10 +25,12 @@ def main0(FP,Delim='\n',EOS='\n',OutFP=None):
                     Syl=OrthsSyls[Orth]
                 FtStrs=Syl.feat_strs()
                 Out.write('\t'.join([Orth]+FtStrs)+'\n')
+            Out.write('\n')
 
 
 def main():
-    FP='/rawData/KyotoCorpus4.0_utf8/all_hiragana.txt'
+    FP=sys.argv[1]
+    #FP='/rawData/KyotoCorpus4.0_utf8/all_hiragana.txt'
     if not os.path.isfile(FP):
         sys.exit(FP+'does not exist')
     main0(FP)

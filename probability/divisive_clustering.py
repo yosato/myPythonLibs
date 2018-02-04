@@ -26,10 +26,12 @@ def main0(ClusterR,distFunc,UpToN=None):
     return Clusters
 
 def split_cluster(ClusterR,distFunc):
+    if len(ClusterR)==2:
+        return ([ClusterR[0]],0),([ClusterR[1]],0)
     ClusterB=[]
     D=1
-    while D>=0:
-        PrvD=0
+    PrvD=-float('inf')
+    while True:
         for Cntr,El in enumerate(ClusterR):
             D,DiamA,DiamB=dist_clusters(El,distFunc,ClusterR,ClusterB)
             if D>PrvD:
@@ -37,13 +39,25 @@ def split_cluster(ClusterR,distFunc):
                 MaxDiamA=DiamA
                 MaxDiamB=DiamB
                 PrvD=D
-        print(str(MaxEl)+' chosen')
-        ClusterR.remove(MaxEl)
-        ClusterB.append(MaxEl)
-        print(str(len(ClusterR)))
-        print(str(len(ClusterB)))
+        if D<0:
+            break
+        else:
+            print(str(MaxEl)+' chosen')
+            ClusterR.remove(MaxEl)
+            ClusterB.append(MaxEl)
+            print(ClusterR)
+            print(ClusterB)
+            PrvD=-float('inf')
+
+    
     return (ClusterR,MaxDiamA),(ClusterB,MaxDiamB)
     
+def diameter_set(Set):
+    if not Set:
+        return 0
+    else:
+        return max(Set)
+
 def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg):
     ClusterAMinusTgt=copy.copy(ClusterAOrg)
     ClusterB=copy.copy(ClusterBOrg)
@@ -51,9 +65,9 @@ def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg):
     LenA=len(ClusterAMinusTgt);LenB=len(ClusterB)
     DistsA=all_dists(distFunc,ClusterAMinusTgt)
     DistsB=all_dists(distFunc,ClusterB)
-    D=(sum(DistsA)/LenA-1)-(0 if not ClusterB else (sum(DistsB)/LenB-1))
-    DiamA=max(DistsA)
-    DiamB=0 if len(ClusterB)<=1 else max(DistsB)
+    D=(0 if not ClusterAMinusTgt else sum(DistsA)/LenA-1)-(0 if not ClusterB else (sum(DistsB)/LenB-1))
+    DiamA=diameter_set(DistsA)
+    DiamB=diameter_set(DistsB)
     return D,DiamA,DiamB
 
 def all_dists(distFunc,Set):
