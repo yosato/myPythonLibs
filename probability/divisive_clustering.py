@@ -4,12 +4,13 @@ from itertools import combinations
 def main0(ClusterR,distFunc,UpToN=None):
     Clusters=[]
     Fst=True
+    MaxClusterCnt=len(ClusterR)-2
     if UpToN is None:
-        IterCnt=len(ClusterR)-1
-    else:
-        IterCnt=UpToN+1
+        UpToN=MaxClusterCnt
+    elif UpToN>MaxClusterCnt:
+        sys.exit('specified count exceeds maximum')
     DiamA=0;DiamB=0;ClusterB=[]
-    while IterCnt:
+    while UpToN<len(Clusters):
         if Fst:
             Fst=False
         else:
@@ -22,14 +23,13 @@ def main0(ClusterR,distFunc,UpToN=None):
         Clusters.append(ClusterA)
         Clusters.append(ClusterB)
         
-        IterCnt=-1
+        IterCnt=IterCnt-1
     return Clusters
 
 def split_cluster(ClusterR,distFunc):
     if len(ClusterR)==2:
         return ([ClusterR[0]],0),([ClusterR[1]],0)
     ClusterB=[]
-    D=1
     PrvD=-float('inf')
     while True:
         for Cntr,El in enumerate(ClusterR):
