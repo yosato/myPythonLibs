@@ -43,7 +43,7 @@ def split_cluster(ClusterR,distFunc):
     ClusterB=[]
     while True:
         Dist,MaxEl=find_max_distance_per_elem(ClusterR,ClusterB,distFunc)
-        #print(Dist)
+        print(Dist)
         if Dist<=0:
             break
         else:
@@ -82,13 +82,26 @@ def find_max_distance_per_elem(ClusterR,ClusterB,distFunc):
             PrvMaxD=MaxD
     return MaxD,MaxEl
 
+def el_against_list_distancesum(TgtEl,List,distFunc):
+    DistSum=0
+    for El in List:
+        DistSum+=distFunc(TgtEl,El)
+    return DistSum
+
+def el_against_list_av(TgtEl,List,distFunc):
+    if len(List)==0:
+        Av=0
+    else:
+        Av=el_against_list_distancesum(TgtEl,List,distFunc)/len(List)
+    return Av
+
 def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg):
     ClusterAMinusTgt=copy.copy(ClusterAOrg)
     ClusterB=copy.copy(ClusterBOrg)
     ClusterAMinusTgt.remove(TgtEl)
-    average_d=lambda C,F:0 if len(C)<=1 else diffstats_list(C,distFunc)[-1][-1]
-    AvDA=average_d(ClusterAMinusTgt,distFunc)
-    AvDB=average_d(ClusterB,distFunc)
+    
+    AvDA=el_against_list_av(TgtEl,ClusterAMinusTgt,distFunc)
+    AvDB=el_against_list_av(TgtEl,ClusterB,distFunc)
 
     return AvDA-AvDB
 
