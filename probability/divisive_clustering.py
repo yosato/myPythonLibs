@@ -1,4 +1,4 @@
-import copy,sys,os
+import copy,sys,os,time
 from itertools import combinations
 
 def main0(ClusterR,distFunc,Debug=False,UpToN=None):
@@ -9,8 +9,8 @@ def main0(ClusterR,distFunc,Debug=False,UpToN=None):
         UpToN=MaxClusterCnt
     elif UpToN>MaxClusterCnt:
         sys.exit('specified count exceeds maximum')
-    ClusterB=[];Cntr=0;ElCnt=len(ClusterR)
-    while len(Clusters)<=UpToN:
+    ClusterB=[];Cntr=0;ElCnt=len(ClusterR);SeenResults={}
+    while len(Clusters)<UpToN:
         Cntr+=1
         if Fst:
             Fst=False
@@ -19,39 +19,41 @@ def main0(ClusterR,distFunc,Debug=False,UpToN=None):
             if Debug: print('index to split: '+str(IndexForSplit))
             ClusterR=Clusters[IndexForSplit]
             del Clusters[IndexForSplit]
-        (ClusterA,ClusterB)=split_cluster(ClusterR,distFunc)
+        (ClusterA,ClusterB),SeenResults=split_cluster(ClusterR,ClusterB,distFunc,SeenResults)
         Clusters.append(ClusterA)
         Clusters.append(ClusterB)
-        if Debug:
-            sys.stderr.write(repr(Clusters)+'\n')
+#        if Debug:
+ #           sys.stderr.write(repr(Clusters)+'\n')
         assert(len(Clusters)==Cntr+1)
         assert(sum(len(Cluster) for Cluster in Clusters)==ElCnt)
     return Clusters
 
-def choose_cluster2split(Clusters,distFunc):
-    MaxDiam=-float('inf')
+def choose_cluster2split(Clusters,distFunc,Linkage='ave'):
+    BestDiam=-float('inf')
     for (Ind,Cluster) in enumerate(Clusters):
-        MaxStat,_,_=diffstats_list(Cluster,distFunc)
-        if MaxStat[0]>MaxDiam:
-            MaxDiam=MaxStat[0];MaxInd=Ind
-    return MaxInd,MaxDiam
+        MaxStat,MinStat,AvStat=diffstats_list(Cluster,distFunc)
+        if Linkage=='max' and MaxStat[0]>BestDiam:
+            BestInd=Ind;BestDiam=MaxStat[0]
+        elif Linkage=='ave' and AvStat[0]>BestDiam:
+            BestInd=Ind; BestDiam=AvStat[0]
+    return BestInd,BestDiam
     
 
-def split_cluster(ClusterR,distFunc):
-    if len(ClusterR)==2:
+def split_cluster(ClusterR,ClusterB,distFunc,SeenResults):
+    OrgClusterLen=len(ClusterR);ClusterBNew=copy.copy(ClusterB)
+    if OrgClusterLen==2:
         return [ClusterR[0]],[ClusterR[1]]
-    ClusterB=[]
+    CloseZeroCnt=0;CloseZeroThr=OrgClusterLen/50
     while True:
-        Dist,MaxEl=find_max_distance_per_elem(ClusterR,ClusterB,distFunc)
-        #print(Dist)
-        if Dist<=0:
-            break
-        else:
-            ClusterR.remove(MaxEl)
-            ClusterB.append(MaxEl)
-            
-    
-    return ClusterR,ClusterB
+        (Dist,MaxEl),SeenResults=find_max_distance_per_elem(ClusterR,ClusterB,distFunc,SeenResults)
+        print(str(len(ClusterR))+': '+str(Dist));time.sleep(2)
+        if Dist<=0.01:
+            CloseZeroCnt+=1
+            if CloseZeroCnt>=CloseZeroThr:
+                break
+        ClusterR.remove(MaxEl)
+        ClusterBNew.append(MaxEl)
+    return (ClusterR,ClusterBNew),SeenResults
     
 def diffstats_list(List,distFunc):
     if len(List)==0:
@@ -73,24 +75,44 @@ def diffstats_list(List,distFunc):
             Sum+=CurD
         return (MaxD,MaxElPair),(MinD,MinElPair),(Sum,Sum/(len(List)-1))
 
-def find_max_distance_per_elem(ClusterR,ClusterB,distFunc):
-    PrvMaxD=-float('inf')
+def dist_el_against_list(TgtEl,List,distFunc,SeenResults={}):
+    Inf=float('inf')
+    MaxD=-Inf;MinD=Inf;Sum=0;MaxEl=None;MinEl=None
+    for El in List:
+        TgtASs=tuple(sorted(list(TgtEl[-1])))
+        CandASs=tuple(sorted(list(El[-1])))
+        Index=(TgtASs,CandASs) if len(TgtASs)<len(CandASs) else (CandASs,TgtASs)
+        if Index in SeenResults.keys():
+            Dist=SeenResults[Index]
+        else:
+            Dist=distFunc(TgtEl,El)
+            SeenResults[Index]=Dist
+        if Dist<MinD:
+            MinEl=El;MinD=Dist
+        if Dist>MaxD:
+            MaxEl=El;MaxD=Dist
+        Sum+=Dist
+    return ((MaxD,MaxEl),(MinD,MinEl),(Sum,0 if not List else Sum/len(List))),SeenResults
+        
+    
+def find_max_distance_per_elem(ClusterR,ClusterB,distFunc,SeenResults):
+    MaxD=-float('inf')
     for Cntr,El in enumerate(ClusterR):
-        MaxD=dist_clusters(El,distFunc,ClusterR,ClusterB)
-        if MaxD>PrvMaxD:
+        D,SeenResults=dist_clusters(El,distFunc,ClusterR,ClusterB,SeenResults)
+        if D>MaxD:
             MaxEl=El
-            PrvMaxD=MaxD
-    return MaxD,MaxEl
+            MaxD=D
+    return (MaxD,MaxEl),SeenResults
 
-def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg):
+def dist_clusters(TgtEl,distFunc,ClusterAOrg,ClusterBOrg,SeenResults):
     ClusterAMinusTgt=copy.copy(ClusterAOrg)
     ClusterB=copy.copy(ClusterBOrg)
     ClusterAMinusTgt.remove(TgtEl)
-    average_d=lambda C,F:0 if len(C)<=1 else diffstats_list(C,distFunc)[-1][-1]
-    AvDA=average_d(ClusterAMinusTgt,distFunc)
-    AvDB=average_d(ClusterB,distFunc)
+#    average_d=lambda C,F:0 if len(C)<=1 else dist_el_against_list()[-1][-1]
+    AvDA,SeenResults=dist_el_against_list(TgtEl,ClusterAMinusTgt,distFunc,SeenResults=SeenResults)
+    AvDB,SeenResults=dist_el_against_list(TgtEl,ClusterB,distFunc,SeenResults=SeenResults)
 
-    return AvDA-AvDB
+    return AvDA[-1][-1]-AvDB[-1][-1],SeenResults
 
 
                    
@@ -106,12 +128,13 @@ def main():
     if not os.path.isfile(Args.data_file):
         sys.exit('named data file ('+Args.data_file+') does not exist')
     if Args.dist_func is None:
-        Args.dist_func=lambda A,B: abs(A-B)
+        print('you should really set a distance function yourself!!! we use the default, i.e. product diff, this time round')
+        time.sleep(2)
     with open(Args.data_file) as FSr:
         ClusterR=set(FSr.read().split())
     if Args.numerical:
         ClusterR=[float(El) for El in ClusterR]
-    main0(ClusterR,Args.dist_func,UpToN=Args.up_to_n,Debug=Args.debug)
+    main0(ClusterR,distFunc=Args.dist_func,UpToN=Args.up_to_n,Debug=Args.debug)
 
 
 
