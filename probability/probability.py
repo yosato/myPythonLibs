@@ -54,12 +54,16 @@ class DiscDist(EquivalEqual):
             self.evtcount=len(EvtProbPairsOrEvtOccPairs.keys())
             EvtProbPairs=self.evtocc2evtprob()
 
-            
-
         self.evtprob=EvtProbPairs
         self.probs=[ Probs for Probs in self.evtprob.values() ]
       #  self.sum_check()
      #  self.evtprob=EvtProbPairs
+
+    def entropy(self):
+        Ent=0
+        for Prob in self.evtprob.values():
+            Ent+=shannon_info(Prob)
+        return -Ent
 
     def filter_evts(self,Thresh):
         if type(Thresh).__name__=='int':
@@ -104,8 +108,10 @@ class DiscDist(EquivalEqual):
 
 class CondDists:
     def __init__(self,CDsR):
-        self.u1s_pds={Wd:DiscDist(PostD) for (Wd,PostD) in CDsR.items()}
-        self.u1scnts={Wd:PostD.totalocc for (Wd,PostD) in self.u1s_pds.items()}
+        # PostD posterior distribution, it's objectified as DiscDist
+        self.u1s_pds={U1:DiscDist(PostD) for (U1,PostD) in CDsR.items()}
+        self.u1scnts={U1:PostD.totalocc for (U1,PostD) in self.u1s_pds.items()}
+        self.u1dist=DiscDist(self.u1scnts)
         self.totalocc_bi=sum([PD.totalocc for PD in self.u1s_pds.values()])
         
         U2sCnts=defaultdict(int)
@@ -115,12 +121,40 @@ class CondDists:
         self.u2scnts=U2sCnts
         self.totalocc_u2var=sum(self.u2scnts.values())
 
-    def get_uniprob_specwd(self,SpecWd,OneTwo):
-        if OneTwo==1:
-            return self.u1scnts[SpecWd]/self.totalocc_bi
-        if OneTwo==2:
-            return self.u2scnts[SpecWd]/self.totalocc_u2var
-    
+#        if OneTwo==1:
+ #           return self.u1scnts[SpecWd]/self.totalocc_bi
+  #      if OneTwo==2:
+   #         return self.u2scnts[SpecWd]/self.totalocc_u2var
+
+
+        
+    def entropy(self):
+        Ent=0
+        for U1,DiscDist in self.u1s_pds.items():
+            Ent+=self.u1dist.evtprob[U1]*DiscDist.entropy()
+        return Ent
+
+    def mutual_info(self):
+        return self.u1dist.entropy-self.entropy
+
+    def kl_divergences(self):
+        Ds={}
+        for U1,PD in self.u1s_pds.items():
+            Ds[U1]=kl_divergence(PD,self.u1dist)
+        return Ds
+
+
+def kl_divergence(MainD,DerivD):
+    CommonEvts=set(MainD.evtprob.keys()).intersection(set(DerivD.evtprob.keys()))
+    if not CommonEvts:
+        return 0
+    else:
+        Ent=0
+        for Evt in CommonEvts:
+            MainDProb=MainD.evtprob[Evt]
+            Ent+=MainDProb*(MainDProb/DerivD.evtprob[Evt])
+        return Ent
+
 def get_cum_list(List):
     Cum=0;NewList=[]
     for El in List:
@@ -202,13 +236,13 @@ def entropy(DiscDist):
     NEntropy=0
 #    DiscDist,Smoothed=SmoothedDiscDist
     for _EventName,Prob in DiscDist.items():
-        NEntropy=NEntropy+entropy_unit(Prob)
+        NEntropy=NEntropy+shannon_info(Prob)
 #    (Cnt,Prob)=Smoothed
 #    Entropy=Entropy+(entropy_moto(Prob)*Cnt)
 
     return -NEntropy
 
-def entropy_unit(Prob):
+def shannon_info(Prob):
     return math.log(Prob,2)*Prob
 
 def mutual_info_unit(Marg1,Marg2,Joint):
