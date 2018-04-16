@@ -33,7 +33,7 @@ def orth_mixed_p(Str):
             return True
     return Bool
 
-def align_han2reading(HanContWd,WdReading,Debug=False):
+def align_han2reading(HanContWd,WdReading,Debug=False,NoAssim=False):
     def make_kanjichunks(HanCntWd):
         KanjiContChunks=[];Chunk=''
         for Char in HanContWd:
