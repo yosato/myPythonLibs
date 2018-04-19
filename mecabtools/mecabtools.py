@@ -96,6 +96,8 @@ def fts2inds(Fts,CorpusOrDic='dic'):
         
     return sorted([Ind for (Ind,Ft) in Mapping.items() if Ft in Fts])
 
+
+
 def pick_feats_fromline(Line,RelvFtNames,Fts=None,CorpusOrDic='corpus'):
     from bidict import bidict
     if not Line.strip():
@@ -143,6 +145,7 @@ def search_feat(MWds,Ft,Val,FstOnly=False):
                 return Fnd
     return Fnd
 
+
 class MecabWdCluster:
     def __init__(self,MecabWdParse,CoreFtNames):
         self.wd=MecabWdParse
@@ -161,12 +164,19 @@ class MecabSentParse:
             Str=Str.strip()
         return Str
     
-class MecabWdParse:
-    def __init__(self,*AVPairs,Costs=None):
+class Word:
+    def __init__(self,*AVPairs):
         self.inherentatts=[A for (A,V) in AVPairs]
-        self.costs=Costs
         for Ft,Val in AVPairs:
             self.__dict__[Ft]=Val
+
+            
+        
+
+class MecabWdParse(Word):
+    def __init__(self,*AVPairs,Costs=None):
+        __super__.self.inherentatts=[A for (A,V) in AVPairs]
+        self.costs=Costs
 
         OblCats=('orth','lemma','cat')
         if not all(OblCat in self.__dict__.keys() for OblCat in OblCats):
