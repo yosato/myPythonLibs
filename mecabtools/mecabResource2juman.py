@@ -1,7 +1,9 @@
+import imp
 import mecab2juman as m2j
 import mecabtools as mtools
 imp.reload(mtools)
 imp.reload(m2j)
+
 
 def main0(FP,PoSTable,DicOrCorpus='corpus'):
     MInhFtsJWds={}
