@@ -6,19 +6,23 @@ imp.reload(m2j)
 
 
 def main0(FP,PoSTable,DicOrCorpus='corpus'):
-    MInhFtsJWds={}
+    SeenFtsWds={}
     with open(FP) as FSr:
         for LiNe in FSr:
             Line=LiNe.strip()
-            MInhFts=mtools.pick_feats_fromline(Line,['orth','cat','subcat','lemma'])
+            Fts=mtools.pick_feats_fromline(Line,['orth','cat','subcat','lemma','sem','subcat2'])
+            FtsTuple=tuple(Fts)
             # this is the check of weather it's done already
-            if MInhFts in MInhFtsJWds.keys():
-                JumanWd=MInhFtsJWds[MInhFts]
+            if FtsTuple in SeenFtsWds.keys():
+                JumanWds=SeenFtsWds[FtsTuple]
                 continue
-            MecabWd=mtools.MecabWordParse(MInhFts)
-            JumanWd=mecabwd2jumanwd(MecabWd,PoSTable)
-            Seen[MecabWd]=JumanWd
-            sys.stdout.write(JumanWd.toString(),WithTailBreak=True)
+            Fts=dict(Fts)
+            MecabWd=mtools.MecabWdParse(Fts)
+            
+            JumanWds=m2j.mecabwd2jumanwd(MecabWd,PoSTable)
+            SeenFtsWds[Fts]=JumanWds
+            for JumanWd in JumanWds:
+                sys.stdout.write(JumanWd.toString(),WithTailBreak=True)
             
 
 def main():

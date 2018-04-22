@@ -78,8 +78,7 @@ def pos_table_m2j(TableFP):
                 continue
             JCats=tuple(JCatsInit)
             for JCat in JCats:
-                if re.match(r'[1-9]$'):
-                    JCatS=JCat[:-1]
+                JCatS=JCat[:-1] if re.match(r'.*[1-9]$',JCat) else JCat
                 assert(JCatS in JCatLeaves)
             MCatsInit=LineEls[0].rstrip().split('\t')
             MCatsInit=MCatsInit+(['*']*(4-len(MCatsInit)))
@@ -114,9 +113,12 @@ def pos_table_m2j(TableFP):
 
 PoSTable=pos_table_m2j(ConvTableFP)
 
-assert(len({Values[0] for Values in PoSTable.values()})==CatCnt)
+#assert(len({Values[0] for Values in PoSTable.values()})==CatCnt)
 
 def mecabwd2jumanwd(MecabWd,PoSTable):
-    JumanPoS=PoSTable[MecabWd.inherentatts]
-    return MecabWd.change_fts(JumanPoS)
+    JumanPoSs=PoSTable[(MecabWd.cat,MecabWd.subcat,MecabWd.subcat2,MecabWd.sem)]
+    JumanWds=[]
+    for JumanPoS in JumanPoSs:
+        JumanWds.append(MecabWd.change_feats({'cat':JumanPoS[0],'subcat':JumanPoS[1]},CopyP=True))
+    return JumanWds
 

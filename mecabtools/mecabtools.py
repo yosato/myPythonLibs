@@ -113,6 +113,11 @@ def pick_feats_fromline(Line,RelvFtNames,Fts=None,CorpusOrDic='corpus'):
         Line=Line.replace(',','、',1)
     LineEls=Line.replace('\t',',').split(',')
     FtCnt=len(LineEls)
+    if Fts is None:
+        Fts=DefFts
+        sys.stderr.write('we use the default feature set'+'\n')
+        sys.stderr.write(repr(Fts)+'\n')
+        sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
     assert(FtCnt==len(Fts) or FtCnt==len(Fts)-2)
     FtCntInLine=len(LineEls)
     RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
@@ -165,22 +170,35 @@ class MecabSentParse:
         return Str
     
 class Word:
-    def __init__(self,*AVPairs):
-        self.inherentatts=[A for (A,V) in AVPairs]
-        for Ft,Val in AVPairs:
+    def __init__(self,AVPairs,InhAtts=None):
+        self.inherentatts=[A for (A,V) in AVPairs.items()] if InhAtts is None else InhAtts
+        for Ft,Val in AVPairs.items():
             self.__dict__[Ft]=Val
-
-            
         
-
-class MecabWdParse(Word):
-    def __init__(self,*AVPairs,Costs=None):
-        __super__.self.inherentatts=[A for (A,V) in AVPairs]
-        self.costs=Costs
-
-        OblCats=('orth','lemma','cat')
-        if not all(OblCat in self.__dict__.keys() for OblCat in OblCats):
+        if not all(OblCat in self.__dict__.keys() for OblCat in self.inherentatts):
             sys.exit('all obligatory categories must be present')
+
+    def change_feats(self,AVPairs,CopyP=False):
+        Self=copy.deepcopy(self) if CopyP else self
+        for (Ft,Val) in AVPairs.items():
+            Self.__dict__[Ft]=Val
+        if CopyP:
+            return Self
+    def delete_feats(self,Atts,InhAsWell=False):
+        for Att in Atts:
+             if Att in self.inherentatts:
+                 if InhAsWell:
+                     self.inherentatts.remove(Att)
+                     del self.__dict__[Att]
+                 else:
+                     sys.stderr.write('cannot delete inherent att: '+Att+'\n')
+             else:
+                 del self.__dict__[Att]
+            
+class MecabWdParse(Word):
+    def __init__(self,AVPairs,Costs=None):
+        super().__init__(AVPairs)
+        self.costs=Costs
 
         self.orthtypes=self.get_orthtypes()
 
@@ -193,6 +211,13 @@ class MecabWdParse(Word):
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
+    def get_jumanline(self,WithTailBreak=True):
+        Str=''
+        Str+=self.orth
+        if WithTailBreak:
+            Str+='\n'
+        return Str
+
     def set_poss(self,Poss):
         self.poss=Poss
         self.count=len(Poss)
