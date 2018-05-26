@@ -593,6 +593,13 @@ class MecabWdParse(Word):
                 Str+=','+','.join([str(Cost) for Cost in self.costs])+','+Rest
         return Str
 
+    def get_jumanline(self,CorpusOrDic='corpus'):
+        
+        Orth=self.orth
+        FtStrs=[self.orth,self.reading,self.lemma,self.cat,self.subcat]
+        FtStr=' '.join(FtStrs)
+        return FtStr
+
 # utility functions to render lines to objects
 def mecabfile2mecabsents(MecabFP):
     ChunksG=file2delimchunks(MecabFP,'EOS')

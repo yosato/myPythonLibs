@@ -1,6 +1,7 @@
 # let's do just PoS conversion, relying on 'neologd2juman' for format changes
 import os,re
 from collections import defaultdict
+from pythonlib_ys import main as myModule
 
 MecabToolsDir=os.path.join(os.environ.get('HOME'),'myProjects/myPythonLibs/mecabtools')
 JumanCatsFN='juman_cats.txt'
@@ -119,6 +120,6 @@ def mecabwd2jumanwd(MecabWd,PoSTable):
     JumanPoSs=PoSTable[(MecabWd.cat,MecabWd.subcat,MecabWd.subcat2,MecabWd.sem)]
     JumanWds=[]
     for JumanPoS in JumanPoSs:
-        JumanWds.append(MecabWd.change_feats({'cat':JumanPoS[0],'subcat':JumanPoS[1]},CopyP=True))
+        JumanWds.append(MecabWd.change_feats({'cat':JumanPoS[0],'subcat':JumanPoS[1],'reading':myModule.kana2kana_wd(MecabWd.reading)},CopyP=True))
     return JumanWds
 
