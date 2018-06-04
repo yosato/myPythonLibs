@@ -117,7 +117,7 @@ PoSTable=pos_table_m2j(ConvTableFP)
 #assert(len({Values[0] for Values in PoSTable.values()})==CatCnt)
 
 def mecabwd2jumanwd(MecabWd,PoSTable):
-    JumanPoSs=PoSTable[(MecabWd.cat,MecabWd.subcat,MecabWd.subcat2,MecabWd.sem)]
+    JumanPoSs=PoSTable[(MecabWd.cat,MecabWd.subcat,MecabWd.subcat2,MecabWd.infform)]
     JumanWds=[]
     for JumanPoS in JumanPoSs:
         JumanWds.append(MecabWd.change_feats({'cat':JumanPoS[0],'subcat':JumanPoS[1],'reading':myModule.kana2kana_wd(MecabWd.reading)},CopyP=True))

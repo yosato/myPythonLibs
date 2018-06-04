@@ -9,20 +9,24 @@ def main0(FP,PoSTable,DicOrCorpus='corpus'):
     SeenFtsWds={}
     with open(FP) as FSr:
         for LiNe in FSr:
+            if LiNe=='EOS\n':
+                sys.stdout.write(LiNe)
+                continue
+            
             Line=LiNe.strip()
-            Fts=mtools.pick_feats_fromline(Line,['orth','cat','subcat','lemma','sem','subcat2','reading'])
+            Fts=mtools.pick_feats_fromline(Line,['orth','cat','subcat','lemma','infform','subcat2','reading'])
             FtsTuple=tuple(Fts)
             # this is the check of weather it's done already
             if FtsTuple in SeenFtsWds.keys():
                 JumanWds=SeenFtsWds[FtsTuple]
                 continue
             Fts=dict(Fts)
-            MecabWd=mtools.MecabWdParse(Fts)
+            MecabWd=mtools.WordParse(Fts)
             
             JumanWds=m2j.mecabwd2jumanwd(MecabWd,PoSTable)
             SeenFtsWds[FtsTuple]=JumanWds
             for JumanWd in JumanWds:
-                sys.stdout.write(JumanWd.get_jumanline())
+                sys.stdout.write(JumanWd.get_jumanline()+'\n')
             
 
 def main():

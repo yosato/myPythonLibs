@@ -170,8 +170,10 @@ class MecabSentParse:
         return Str
     
 class Word:
-    def __init__(self,AVPairs,InhAtts=None):
-        self.inherentatts=[A for (A,V) in AVPairs.items()] if InhAtts is None else InhAtts
+    def __init__(self,AVPairs,InhAtts=[]):
+        assert all(InhAtt in AVPairs.keys() for InhAtt in InhAtts)
+        self.metaatts={'inherentatts','metaatts'}
+        self.inherentatts={A for (A,V) in AVPairs.items() if A in InhAtts}
         for Ft,Val in AVPairs.items():
             self.__dict__[Ft]=Val
         
@@ -195,13 +197,38 @@ class Word:
              else:
                  del self.__dict__[Att]
             
-class MecabWdParse(Word):
-    def __init__(self,AVPairs,Costs=None):
+class WordParse(Word):
+    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infform'}):
         super().__init__(AVPairs)
+        self.inherentatts=self.inherentatts.union(InhAtts)
         self.costs=Costs
 
         self.orthtypes=self.get_orthtypes()
+    def get_orthtypes(self):
+        Types=[];PrvType=''
+        for Char in self.orth:
+            CurType=myModule.identify_chartype(Char)
+            if CurType!=PrvType:
+                Types.append(CurType)
+            PrvType=CurType
+        return Types
+    def get_feature_strs(self,OrderedKeys=None,InhOnly=True):
+        RestrictedSet=self.inherentatts if InhOnly else {A for A in self.__dict__.keys() if A not in self.metaatts}
+        Dict={Att:Val for (Att,Val) in self.__dict__.items() if Att in RestrictedSet}
+        Pairs=reorder_dict(Dict,OrderedKeys) if OrderedKeys else Dict.items()
+        return [str(Val) for (Att,Val) in Pairs]
+            
+    
+    def get_jumanline(self,CorpusOrDic='corpus'):
+        
+        Orth=self.orth
+        FtStrs=self.get_feature_strs(OrderedKeys=['orth','reading','lemma','cat','subcat','subcat2','infform'])
+        FtStr=' '.join(FtStrs)
+        return FtStr
 
+class MecabWdParse(WordParse):        
+    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading'}):
+        super().__init__(AVPairs)
         if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
 
@@ -211,13 +238,6 @@ class MecabWdParse(Word):
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
-    def get_jumanline(self,WithTailBreak=True):
-        Str=''
-        Str+=self.orth
-        if WithTailBreak:
-            Str+='\n'
-        return Str
-
     def set_poss(self,Poss):
         self.poss=Poss
         self.count=len(Poss)
@@ -234,15 +254,6 @@ class MecabWdParse(Word):
             if Ft not in Excepts and not self.__dict__[Ft]==AnotherWd.__dict__[Ft]:
                 return not DefBool
         return DefBool
-
-    def get_orthtypes(self):
-        Types=[];PrvType=''
-        for Char in self.orth:
-            CurType=myModule.identify_chartype(Char)
-            if CurType!=PrvType:
-                Types.append(CurType)
-            PrvType=CurType
-        return Types
 
     def divide_stem_suffix_radical(self,OutputObject=True,StrictP=False):
         IrregTable= {
@@ -593,13 +604,17 @@ class MecabWdParse(Word):
                 Str+=','+','.join([str(Cost) for Cost in self.costs])+','+Rest
         return Str
 
-    def get_jumanline(self,CorpusOrDic='corpus'):
-        
-        Orth=self.orth
-        FtStrs=[self.orth,self.reading,self.lemma,self.cat,self.subcat]
-        FtStr=' '.join(FtStrs)
-        return FtStr
 
+
+def reorder_dict(Dict,OrderedKeys):
+    if any(OrderedKey not in Dict.keys() for OrderedKey in OrderedKeys):
+        sys.exit('key in orderedkeys does not exist')
+    PairsHead=[];PairsTail=[]
+    for Key in Dict.keys():
+        PairsToAppend=PairsHead if Key in OrderedKeys else PairsTail
+        PairsToAppend.append((Key,Dict[Key]))
+    return PairsHead+PairsTail
+    
 # utility functions to render lines to objects
 def mecabfile2mecabsents(MecabFP):
     ChunksG=file2delimchunks(MecabFP,'EOS')
