@@ -198,7 +198,7 @@ class Word:
                  del self.__dict__[Att]
             
 class WordParse(Word):
-    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infform'}):
+    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','lemma','reading'}):
         super().__init__(AVPairs)
         self.inherentatts=self.inherentatts.union(InhAtts)
         self.costs=Costs
@@ -227,17 +227,23 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading'}):
+    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'},IdentityAtts={'cat','orth','infform'}):
         super().__init__(AVPairs)
+        self.inherentatts=self.inherentatts.union(InhAtts)
+        self.identityattsvals={K:V for K:V in AVPairs if K in IdentityAtts}
         if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
-
+         
         self.soundrules=[]; self.variants=[]
         self.count=None
         self.poss=None
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
+
+    def same_type(self,AnotherWd):
+        return self.identityattsvals==AnotherWd.identityattsvals
+    
     def set_poss(self,Poss):
         self.poss=Poss
         self.count=len(Poss)
@@ -621,6 +627,34 @@ def mecabfile2mecabsents(MecabFP):
     for Chunk in ChunksG:
         MecabWds=[mecabline2mecabwd(Line,'corpus') for Line in Chunk]
         yield MecabSentParse(MecabWds)
+    
+def translate_dics(SrcDic,SrcFts,TgtDic,TgtFts,IdentityAtts={'orth','cat','infform'}):
+    if SrcFts==TgtFts:
+        SubsumptionType='identical'
+    
+    elif  SrcFts.issubset(TgtFts):
+        SubsumptionType='enlarge'
+    elif TgtFts.issubset(SrcFts):
+        SubsumptionType='reduction'
+    else:
+        SubsumptionType='idiosyncratic'
+    
+    TgtIdAtts=extract_identityatts(TgtDic)    
+    if SubsumptionType=='reduction':
+        with open(SrcDic) as FSr:
+            for LiNe in FSr:
+                SrcWdFts=line2wdfts(LiNe.strip())
+ 
+def extract_identityatts(DicFP,IdentityAtts):
+    IdentityAttSetsInds=[]
+    with open(DicFP) as FSr:
+        for Ind,LiNe in enumerate(FSr):
+            WdFts=line2wdfts(LiNe.strip())
+            IdentityAtts={}
+            IdentityAttSetInds.append((Ind,IdentityAtts))
+    
+    
+
     
 def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
