@@ -27,6 +27,45 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
+
+def translate_dics(SrcDic,SrcFts,TgtDic,TgtFts,IdentityAtts={'orth','cat','infform'}):
+    if SrcFts==TgtFts:
+        SubsumptionType='identical'
+    
+    elif  SrcFts.issubset(TgtFts):
+        SubsumptionType='enlarge'
+    elif TgtFts.issubset(SrcFts):
+        SubsumptionType='reduction'
+    else:
+        SubsumptionType='idiosyncratic'
+    
+    TgtIdAtts=extract_identityatts(TgtDic)
+    SrcIdAtts=extract_identityatts(SrcDic)
+    LineMappings=make_linemappings(TgtIdAtts,SrcIdAtts)
+
+    Translations=[]
+    if SubsumptionType=='reduction':
+        with open(SrcDic) as FSr:
+            for Cntr,LiNe in enumerate(FSr):
+                if Cntr==LineMappings[0][0]:
+                    SrcWdFts=line2wdfts(LiNe.strip())
+                    TgtFts=line2wdfts(get_line(LineMappings[0][1]))
+                    
+                else:
+                    sys.stdout.write()
+
+ 
+def extract_identityattvals(DicFP,IdentityAtts):
+    IdentityAttSetsInds=[]
+    with open(DicFP) as FSr:
+        for Ind,LiNe in enumerate(FSr):
+            WdFts=line2wdfts(LiNe.strip())
+            IdentityAttsVals={Att:Val for (Att,Val) in WdFt.items() if Att in IdentityAtts}
+            IdentityAttValSetInds.append((Ind,IdentityAttsVals))
+    
+
+
+
 def radicalise_mecabline(MecabCorpusLiNe):
     Line=MecabCorpusLiNe.strip()
     MWd=mecabline2mecabwd(Line,CorpusOrDic='corpus')
@@ -627,31 +666,6 @@ def mecabfile2mecabsents(MecabFP):
     for Chunk in ChunksG:
         MecabWds=[mecabline2mecabwd(Line,'corpus') for Line in Chunk]
         yield MecabSentParse(MecabWds)
-    
-def translate_dics(SrcDic,SrcFts,TgtDic,TgtFts,IdentityAtts={'orth','cat','infform'}):
-    if SrcFts==TgtFts:
-        SubsumptionType='identical'
-    
-    elif  SrcFts.issubset(TgtFts):
-        SubsumptionType='enlarge'
-    elif TgtFts.issubset(SrcFts):
-        SubsumptionType='reduction'
-    else:
-        SubsumptionType='idiosyncratic'
-    
-    TgtIdAtts=extract_identityatts(TgtDic)    
-    if SubsumptionType=='reduction':
-        with open(SrcDic) as FSr:
-            for LiNe in FSr:
-                SrcWdFts=line2wdfts(LiNe.strip())
- 
-def extract_identityatts(DicFP,IdentityAtts):
-    IdentityAttSetsInds=[]
-    with open(DicFP) as FSr:
-        for Ind,LiNe in enumerate(FSr):
-            WdFts=line2wdfts(LiNe.strip())
-            IdentityAtts={}
-            IdentityAttSetInds.append((Ind,IdentityAtts))
     
     
 
