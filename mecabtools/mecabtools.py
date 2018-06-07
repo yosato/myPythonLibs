@@ -28,24 +28,23 @@ IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
 
-def translate_dics(SrcDic,SrcFts,TgtDic,TgtFts,IdentityAtts={'orth','cat','infform'}):
-    if SrcFts==TgtFts:
+def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,IdentityAtts={'orth','cat','infform'}):
+    SrcFtSet,TgtFtSet=set(SrcFts),set(TgtFts)
+    if SrcFtSet==TgtFtSet:
         SubsumptionType='identical'
     
-    elif  SrcFts.issubset(TgtFts):
-        SubsumptionType='enlarge'
-    elif TgtFts.issubset(SrcFts):
+    elif SrcFtSet.issubset(TgtFtSet):
         SubsumptionType='reduction'
+    elif TgtFtSet.issubset(SrcFtSet):
+        SubsumptionType='enlarge'
     else:
         SubsumptionType='idiosyncratic'
     
-    TgtIdAtts=extract_identityatts(TgtDic)
-    SrcIdAtts=extract_identityatts(SrcDic)
-    LineMappings=make_linemappings(TgtIdAtts,SrcIdAtts)
+    SrcIdAtts=extract_identityattsvals([SrcRes],SrcType,SrcFts)
 
     Translations=[]
     if SubsumptionType=='reduction':
-        with open(SrcDic) as FSr:
+        with open(TgtDic) as FSr:
             for Cntr,LiNe in enumerate(FSr):
                 if Cntr==LineMappings[0][0]:
                     SrcWdFts=line2wdfts(LiNe.strip())
@@ -55,13 +54,23 @@ def translate_dics(SrcDic,SrcFts,TgtDic,TgtFts,IdentityAtts={'orth','cat','inffo
                     sys.stdout.write()
 
  
-def extract_identityattvals(DicFP,IdentityAtts):
-    IdentityAttSetsInds=[]
-    with open(DicFP) as FSr:
-        for Ind,LiNe in enumerate(FSr):
-            WdFts=line2wdfts(LiNe.strip())
-            IdentityAttsVals={Att:Val for (Att,Val) in WdFt.items() if Att in IdentityAtts}
-            IdentityAttValSetInds.append((Ind,IdentityAttsVals))
+def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','infform'}):
+    assert Type=='dic' or Type=='corpus'
+    assert type(SrcFts).__name__=='list'
+    IdentityIndsAVs=[]
+    if Type=='corpus':
+        Seen=set()
+    for ResFP in ResFPs:
+        with open(ResFP) as FSr:
+            for Ind,LiNe in enumerate(FSr):
+                if Type=='corpus' and LiNe=='EOS\n':
+                    continue
+                WdFts=line2wdfts(LiNe.strip(),CorpusOrDic=Type,Fts=SrcFts)
+                IdentityAttVals=tuple([Val for (Att,Val) in WdFts[0] if Att in IdentityAtts])              
+                if Type=='dic' or IdentityAttVals not in Seen:
+                    IdentityIndsAVs.append((Ind,IdentityAttVals))
+                    Seen.add(IdentityAttVals)
+    return IdentityIndsAVs
     
 
 
@@ -269,7 +278,7 @@ class MecabWdParse(WordParse):
     def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'},IdentityAtts={'cat','orth','infform'}):
         super().__init__(AVPairs)
         self.inherentatts=self.inherentatts.union(InhAtts)
-        self.identityattsvals={K:V for K:V in AVPairs if K in IdentityAtts}
+        self.identityattsvals={K:V for (K,V) in AVPairs.items() if K in IdentityAtts}
         if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
          
@@ -677,6 +686,13 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     return MecabWdParse(*FtsVals,Costs=Costs)
 
 def line2wdfts(Line,CorpusOrDic='corpus',Fts=None,WithCost=False):
+    assert type(Fts).__name__=='list'
+    assert CorpusOrDic in ['dic','corpus']
+    if CorpusOrDic=='corpus': 
+        assert '\t' in Line
+    if CorpusOrDic=='dic': 
+        assert '\t' not in Line
+    
     Fts=DefFts if not Fts else Fts
     if CorpusOrDic=='corpus':
         WdFtStrPlusNote=Line.strip().split('\t')
