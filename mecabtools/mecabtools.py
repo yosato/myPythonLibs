@@ -50,7 +50,6 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
                 for LiNe in FSr:
                     SrcWdFts=line2wdfts(LiNe.strip(),CorpusOrDic='dic')
                     if SrcIndAtts:
-                        TgtFts=line2wdfts(get_line(LineMappings[0][1]))
                         IdentittyAtts=tuple([Val for (Att,Val) in WdFts[0] if Att in IdentityAtts])
                         if IdentityAtts in SrcAtts:
                             RedFts={A:V for (A,V) in TgtFts if A in SrcAtts}
