@@ -45,10 +45,9 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
     Translations=[]
     if SubsumptionType=='reduction':
         with open(TgtDic) as FSr:
-            for Cntr,LiNe in enumerate(FSr):
-                if Cntr==LineMappings[0][0]:
-                    SrcWdFts=line2wdfts(LiNe.strip())
-                    TgtFts=line2wdfts(get_line(LineMappings[0][1]))
+            SrcWdFts=line2wdfts(LiNe.strip())
+            if SrcIdAtts.values():
+            TgtFts=line2wdfts(get_line(LineMappings[0][1]))
                     
                 else:
                     sys.stdout.write()
