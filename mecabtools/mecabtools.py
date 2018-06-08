@@ -41,7 +41,8 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
         SubsumptionType='idiosyncratic'
     
     SrcIndAtts=extract_identityattsvals([SrcRes],SrcType,SrcFts)
-    SrcAtts=dict(SrcIndAtts).values()
+    SrcIAttVals=[SrcIndAtt[1] for SrcIndAtt in SrcIndAtts]
+    SrcIAttValsR=[SrcIAttVal[:-1] for SrcIAttVal in SrcIAttVals]
 
     Translations=[]
     if SubsumptionType=='reduction':
@@ -49,15 +50,17 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
             with open(TgtDic) as FSr:
                 for LiNe in FSr:
                     SrcWdFts=line2wdfts(LiNe.strip(),CorpusOrDic='dic')
-                    if SrcIndAtts:
-                        IdentittyAtts=tuple([Val for (Att,Val) in WdFts[0] if Att in IdentityAtts])
-                        if IdentityAtts in SrcAtts:
-                            RedFts={A:V for (A,V) in TgtFts if A in SrcAtts}
-                            Wd=MecabWdParse(RedFts)
-                            sys.stdout.write(Wd.get_mecabline()+'\n')
-                        else:
-                            sys.stdout.write(LiNe)
-
+                    IAttVals=tuple([Val for (Att,Val) in SrcWdFts if Att in IdentityAtts])
+                    if IAttVals in SrcIAttVals:
+                        RedFts={A:V for (A,V) in TgtFts if A in SrcAtts}
+                        Wd=MecabWdParse(RedFts)
+                        sys.stdout.write(Wd.get_mecabline()+'\n')
+                    elif IAttVals[:-1] in SrcIAttValsR:
+                        print(IAttVals)
+                        print([Val for Val in SrcIAttVals if IAttVals[:-1]==Val[:-1]])
+                        print()
+                    else:
+                        sys.stdout.write(LiNe)
  
 def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','infform'}):
     assert Type=='dic' or Type=='corpus'
@@ -70,8 +73,8 @@ def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','inff
             for Ind,LiNe in enumerate(FSr):
                 if Type=='corpus' and LiNe=='EOS\n':
                     continue
-                WdFts=dict(line2wdfts(LiNe.strip(),CorpusOrDic=Type,Fts=SrcFts)[0])
-                IdentityAttVals=tuple([Val for (Att,Val) in WdFts.items() if Att in IdentityAtts])              
+                WdFts=line2wdfts(LiNe.strip(),CorpusOrDic=Type,Fts=SrcFts)
+                IdentityAttVals=tuple([Val for (Att,Val) in WdFts if Att in IdentityAtts])              
                 if Type=='corpus':
                     if IdentityAtts not in Seen:
                         Seen.add(IdentityAttVals)
@@ -693,9 +696,10 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
     return MecabWdParse(*FtsVals,Costs=Costs)
 
-def line2wdfts(Line,CorpusOrDic='corpus',Fts=None,WithCost=False):
+def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
     assert CorpusOrDic in ['dic','corpus']
+    assert TupleOrDict in ['dict','tuple']
     if CorpusOrDic=='corpus': 
         assert '\t' in Line
     if CorpusOrDic=='dic': 
@@ -717,8 +721,12 @@ def line2wdfts(Line,CorpusOrDic='corpus',Fts=None,WithCost=False):
             Costs=None
     assert(len(Fts)==len(Vals))
     FtsVals=list(zip(Fts,Vals))
-#    FtsVals.append('costs',Costs))
-    return FtsVals,Costs
+    if TupleOrDict=='dict':
+        FtsVals=dict(FtsVals)
+    if WithCost:
+        FtsVals=(FtsVals,Costs)
+
+    return FtsVals
 
 def eos_p(Line):
     return Line.strip()=='EOS'
