@@ -44,23 +44,22 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
     SrcIAttVals=[SrcIndAtt[1] for SrcIndAtt in SrcIndAtts]
     SrcIAttValsR=[SrcIAttVal[:-1] for SrcIAttVal in SrcIAttVals]
 
-    Translations=[]
+    Translations=[];NearMisses=defaultdict(set)
     if SubsumptionType=='reduction':
         for TgtDic in TgtDics:
             with open(TgtDic) as FSr:
                 for LiNe in FSr:
-                    SrcWdFts=line2wdfts(LiNe.strip(),CorpusOrDic='dic')
+                    TgtWdFts=line2wdfts(LiNe.strip(),CorpusOrDic='dic')
                     IAttVals=tuple([Val for (Att,Val) in SrcWdFts if Att in IdentityAtts])
                     if IAttVals in SrcIAttVals:
-                        RedFts={A:V for (A,V) in TgtFts if A in SrcAtts}
+                    RedFts={A:V for (A,V) in TgtWdFts if A in SrcFts}
                         Wd=MecabWdParse(RedFts)
-                        sys.stdout.write(Wd.get_mecabline()+'\n')
+                        Translations.append(Wd)
                     elif IAttVals[:-1] in SrcIAttValsR:
-                        print(IAttVals)
-                        print([Val for Val in SrcIAttVals if IAttVals[:-1]==Val[:-1]])
-                        print()
-                    else:
-                        sys.stdout.write(LiNe)
+                        NearlyMissed=tuple([Val for Val in SrcIAttVals if IAttVals[:-1]==Val[:-1]])
+                        NearMisses[IAttVals].add(NearlyMissed)
+        print() 
+
  
 def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','infform'}):
     assert Type=='dic' or Type=='corpus'
