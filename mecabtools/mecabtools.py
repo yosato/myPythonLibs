@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil,subprocess,collections, copy
+import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict
 from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
@@ -27,6 +27,18 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
+def get_line(FP,LiNum):
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if Cntr+1==LiNum:
+                return LiNe.strip()
+        return None
+
+def decompose_corpusline(CorpusLine):
+    assert '\t' in CorpusLine and ',' in CorpusLine
+    Orth,Rest=CorpusLine.strip().split('\t')
+    Fts=Rest.strip().split(',')
+    return [Orth,Fts]
 
 def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,IdentityAtts={'orth','cat','infform'}):
     SrcFtSet,TgtFtSet=set(SrcFts),set(TgtFts)
@@ -40,31 +52,72 @@ def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,Ident
     else:
         SubsumptionType='idiosyncratic'
     
-    SrcIndAtts=extract_identityattsvals([SrcRes],SrcType,SrcFts)
-    SrcIAttVals=[SrcIndAtt[1] for SrcIndAtt in SrcIndAtts]
-    SrcIAttValsR=[SrcIAttVal[:-1] for SrcIAttVal in SrcIAttVals]
+    SrcIAValsInds=extract_identityattvals([SrcRes],SrcType,SrcFts,IdentityAtts)
+    TranslatedDicFP=os.path.join(os.path.dirname(TgtDics[0]),'translation.csv')
+    SrcTransMappings,NearMisses=create_newdic_mapping(SrcIAValsInds,SrcFts,SubsumptionType,TgtDics,IdentityAtts,TranslatedDicFP)
+    LineIndsWithTrans=SrcTransMappings.keys()
+    FstIndsOthers={Inds[0]:Inds[1:] for Inds in LineIndsWithTrans}
+    SrcTransMappings={SrcInds[0]:TgtInd for (SrcInds,TgtInd) in SrcTransMappings.items()}
+    IndTrans={}
+    with open(SrcRes) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if LiNe=='EOS\n':
+                Output=LiNe
 
-    Translations=[];NearMisses=defaultdict(set)
-    if SubsumptionType=='reduction':
+            elif Cntr in SrcTransMappings.keys():
+                Output=get_line(TranslatedDicFP,SrcTransMappings[Cntr]+1)+'\n'
+                OtherInds=FstIndsOthers[Cntr]
+                IndTrans[OtherInds]=Output
+#                AllOtherInds.extends[OtherInds]
+    #        elif Cntr in AllOtherInds:
+     #           for IndSet in IndTrans.keys():
+      #              if Cntr in IndSet:
+       #                 Output=IndTrans[IndSet]
+        #                break                
+            else:
+                Orth,Fts=decompose_corpusline(LiNe)
+                Output=Orth+'\t'+','.join(Fts[:len(SrcFts)-1])+'\n'
+            sys.stdout.write(Output)
+                
+
+def create_newdic_mapping(SrcIAValsInds,SrcFts,SubsumptionType,TgtDics,IdentityAtts,OutFP):
+    # creating new translated dic in file
+    # while mapping is created as a dict
+    SrcIAVals=SrcIAValsInds.keys()
+    SrcIAValsR=[SrcIAVal[:-1] for SrcIAVal in SrcIAVals]
+
+    Mappings={}
+    OutFSr=open(OutFP,'wt')
+    NearMisses=defaultdict(set)
+    TransCnt=0
+    if SubsumptionType in ['reduction','identical']:
         for TgtDic in TgtDics:
             with open(TgtDic) as FSr:
                 for LiNe in FSr:
-                    TgtWdFts=line2wdfts(LiNe.strip(),CorpusOrDic='dic')
-                    IAttVals=tuple([Val for (Att,Val) in SrcWdFts if Att in IdentityAtts])
-                    if IAttVals in SrcIAttVals:
-                    RedFts={A:V for (A,V) in TgtWdFts if A in SrcFts}
-                        Wd=MecabWdParse(RedFts)
-                        Translations.append(Wd)
-                    elif IAttVals[:-1] in SrcIAttValsR:
-                        NearlyMissed=tuple([Val for Val in SrcIAttVals if IAttVals[:-1]==Val[:-1]])
-                        NearMisses[IAttVals].add(NearlyMissed)
-        print() 
+                    Line=LiNe.strip()
+                    LineEls=Line.split(',')
+                    TgtWdFts=line2wdfts(Line,CorpusOrDic='dic')
+                    TgtIAVals=tuple([Val for (Att,Val) in TgtWdFts if Att in IdentityAtts])
+                    Costs=LineEls[1:3]
+                    if TgtIAVals in SrcIAVals:
+                        TransCnt+=1
+                        RedFts=[V for (A,V) in TgtWdFts if A in SrcFts]
+                        OutputLine=','.join([RedFts[0]]+Costs+RedFts[1:])
+                        Mappings[tuple(SrcIAValsInds[TgtIAVals])]=TransCnt-1
+                        OutFSr.write(OutputLine+'\n')
+                        
+                    elif TgtIAVals[:-1] in SrcIAValsR:
+                        NearlyMissed=tuple([Val for Val in SrcIAVals if TgtIAVals[:-1]==Val[:-1]])
+                        NearMisses[TgtIAVals].add(NearlyMissed)
+    OutFSr.close()                
+    return Mappings,NearMisses
+     
 
  
-def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','infform'}):
+def extract_identityattvals(ResFPs,Type,SrcFts,IdentityAtts):
     assert Type=='dic' or Type=='corpus'
     assert type(SrcFts).__name__=='list'
-    IdentityIndsIAtts=[]
+    IAttsInds=defaultdict(list)
     if Type=='corpus':
         Seen=set()
     for ResFP in ResFPs:
@@ -77,10 +130,10 @@ def extract_identityattsvals(ResFPs,Type,SrcFts,IdentityAtts={'orth','cat','inff
                 if Type=='corpus':
                     if IdentityAtts not in Seen:
                         Seen.add(IdentityAttVals)
-                        IdentityIndsIAtts.append((Ind,IdentityAttVals))
+                        IAttsInds[IdentityAttVals].append(Ind)
                 else:
-                    IdentityIndsIAtts.append((Ind,IdentityAttVals))
-    return IdentityIndsIAtts
+                    IAttsInds[IdentityAttVals].append(Ind)
+    return IAttsInds
     
 
 
@@ -229,6 +282,7 @@ class MecabSentParse:
     
 class Word:
     def __init__(self,AVPairs,InhAtts=[]):
+        assert AVPairs.keys()
         assert all(InhAtt in AVPairs.keys() for InhAtt in InhAtts)
         self.metaatts={'inherentatts','metaatts'}
         self.inherentatts={A for (A,V) in AVPairs.items() if A in InhAtts}
