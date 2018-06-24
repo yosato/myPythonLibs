@@ -13,6 +13,30 @@ from pdb import set_trace
 #answer = input(prompt)
 #t.cancel()
 
+def merge_tuples_withindex(Tuples):
+    assert all(len(Tuple)==len(Tuples[0]) for Tuple in Tuples[1:])
+    TupleLen=len(Tuples[0])
+    MgdTuples=[]
+    for i in range(TupleLen):
+        MgdTuples.append([Tuple[i] for Tuple in Tuples])
+    return MgdTuples
+        
+
+def merge_filenames(FNs):
+    assert all('/' not in FN for FN in FNs)
+    Stems,Exts=merge_tuples_withindex([get_stem_ext(FN) for FN in FNs])
+    assert all(Ext==Exts[0] for Ext in Exts[1:])
+    Ext=Exts[0]
+        
+    StemStrs=[]
+    for Cntr,Stem in enumerate(Stems):
+        if Cntr>4:
+            StemStrs.append('others')
+            break
+        StemStrs.append(Stem)
+    return '--'.join(StemStrs)+'.'+Ext
+        
+        
 def list2inddict(L):
     return {Ind:El for (Ind,El) in enumerate(L)}
 

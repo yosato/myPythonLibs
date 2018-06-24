@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict
+import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict,glob
 from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
@@ -6,6 +6,7 @@ import romkan
 from pythonlib_ys import jp_morph
 imp.reload(myModule)
 imp.reload(jp_morph)
+
 try:
     from ipdb import set_trace
 except:
@@ -26,6 +27,35 @@ DefLexFtsInds={ Ft:Ind for (Ind,Ft) in DefLexIndsFts.items() }
 InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
+
+def create_indexing_dic(DicDir,Alphabetical=True):
+    DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
+    DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
+    assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
+    MgdDicName=myModule.merge_filenames(DicFNs)
+    OutFPStem=MgdDicName+'.objdic'
+    for Katakana in [Char for Char in list(jp_morph.GojuonStrK) if Char not in ['\n','ン']]:
+        MecabWds={}
+        for DicFP in DicFPs:
+            with open(DicFP) as FSr:
+                for LiNe in FSr:
+                    Line=LiNe.strip()
+                    if not Alphabetical or Katakana==pick_feats_fromline(Line,['reading'])['reading'][0][0]:
+                        MecabWd=mecabline2mecabwd(LiNe.strip())
+                        MecabWds[MecabWd.identityatts]=MecabWd
+        myModule.dump_pickle(MecabWds,OutFPStem+'_'+Katakana)
+            
+
+def dic_or_corpus(FP):
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if Cntr>100:
+                break
+            else:
+                if '\t' in LiNe:
+                    return 'corpus'
+                else:
+                    return 'dic'
 
 def get_line(FP,LiNum):
     with open(FP) as FSr:
@@ -209,7 +239,7 @@ def fts2inds(Fts,CorpusOrDic='dic'):
 
 
 
-def pick_feats_fromline(Line,RelvFtNames,Fts=None,CorpusOrDic='corpus'):
+def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrDic='corpus'):
     from bidict import bidict
     if not Line.strip():
         print('empty line encountered')
