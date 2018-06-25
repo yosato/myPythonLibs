@@ -20,7 +20,7 @@ HomeDir=os.getenv('HOME')
 DefFts=['orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation']
 DefIndsFts={Ind:Ft for (Ind,Ft) in enumerate(DefFts)}
 DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
-DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
+DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'leftid'),(3,'cost')])
 # the reverse list from ft to ind
 DefFtsInds={ Ft:Ind for (Ind,Ft) in DefIndsFts.items() }
 DefLexFtsInds={ Ft:Ind for (Ind,Ft) in DefLexIndsFts.items() }
@@ -30,6 +30,8 @@ DinasourPats=('ラ変','文語','四段','下二','上二')
 
 def create_indexing_dic(DicDir,Alphabetical=True):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
+    if not DicFPs:
+        sys.exit('no dics in the specified dir')
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
     MgdDicName=myModule.merge_filenames(DicFNs)
@@ -40,9 +42,12 @@ def create_indexing_dic(DicDir,Alphabetical=True):
             with open(DicFP) as FSr:
                 for LiNe in FSr:
                     Line=LiNe.strip()
-                    if not Alphabetical or Katakana==pick_feats_fromline(Line,['reading'])['reading'][0][0]:
-                        MecabWd=mecabline2mecabwd(LiNe.strip())
-                        MecabWds[MecabWd.identityatts]=MecabWd
+                    if len(Line.split(','))!=13:
+                        print('invalid line')
+                        continue
+                    if not Alphabetical or Katakana==dict(pick_feats_fromline(Line,['reading'],CorpusOrDic='dic'))['reading'][0]:
+                        MecabWd=mecabline2mecabwd(LiNe.strip(),CorpusOrDic='dic')
+                        MecabWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
         myModule.dump_pickle(MecabWds,OutFPStem+'_'+Katakana)
             
 
@@ -253,12 +258,12 @@ def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrD
     if Line.startswith(','):
         Line=Line.replace(',','、',1)
     LineEls=Line.replace('\t',',').split(',')
-    FtCnt=len(LineEls)
+    FtCnt=len(LineEls)-3 if CorpusOrDic else len(LineEls)
     if Fts is None:
         Fts=DefFts
-        sys.stderr.write('we use the default feature set'+'\n')
-        sys.stderr.write(repr(Fts)+'\n')
-        sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
+#        sys.stderr.write('we use the default feature set'+'\n')
+ #       sys.stderr.write(repr(Fts)+'\n')
+  #      sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
     assert(FtCnt==len(Fts) or FtCnt==len(Fts)-2)
     FtCntInLine=len(LineEls)
     RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
@@ -777,7 +782,7 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
     WithCost=False if CorpusOrDic=='corpus' else WithCost
     FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
-    return MecabWdParse(*FtsVals,Costs=Costs)
+    return MecabWdParse(dict(FtsVals),Costs=Costs)
 
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
