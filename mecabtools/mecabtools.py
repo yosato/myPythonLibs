@@ -28,22 +28,58 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
-def create_indexing_dic(DicDir,Alphabetical=True):
+
+def create_indexed_dic(DicDir,Lang='jp'):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
-    DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
+    assert DicFPs
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
+    SandboxOutputDir=os.path.join(DicDir,'objdics')
+    if not os.path.isdir(SandboxOutputDir):
+        os.makedirs(SandboxOutputDir)
+    DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
+    for DicFN in DicFNs:
+        Copy=os.path.join(SandboxOutputDir,DicFN+'.rest')
+        shutil.copy(os.path.join(DicDir,DicFN),Copy)
     MgdDicName=myModule.merge_filenames(DicFNs)
-    OutFPStem=MgdDicName+'.objdic'
-    for Katakana in [Char for Char in list(jp_morph.GojuonStrK) if Char not in ['\n','ン']]:
+    OutFPStem=os.path.join(SandboxOutputDir,MgdDicName+'.objdic')
+    if Lang=='jp':
+        Chars=set([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョ')])
+    for CharCntr,Char in enumerate(Chars):
+        sys.stderr.write('\nWords starting with '+Char+' sought\n')
         MecabWds={}
-        for DicFP in DicFPs:
-            with open(DicFP) as FSr:
+        if CharCntr==0:
+            MecabOutsiders={}
+        for DicFN in DicFNs:
+            SBFPStem=os.path.join(SandboxOutputDir,DicFN)
+            TmpFP=SBFPStem+'.tmp'
+            TmpFSw=open(TmpFP,'wt')
+            RestFP=SBFPStem+'.rest'
+            sys.stderr.write(DicFN+'\n')
+            with open(RestFP) as FSr:
                 for LiNe in FSr:
                     Line=LiNe.strip()
-                    if not Alphabetical or Katakana==pick_feats_fromline(Line,['reading'])['reading'][0][0]:
-                        MecabWd=mecabline2mecabwd(LiNe.strip())
-                        MecabWds[MecabWd.identityatts]=MecabWd
-        myModule.dump_pickle(MecabWds,OutFPStem+'_'+Katakana)
+                    StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
+                    if Char==StartChar:
+                        MecabWd=mecabline2mecabwd(Line,'dic')
+                        MecabWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
+                    elif CharCntr==0 and StartChar not in Chars:
+                        MecabOutsider=mecabline2mecabwd(Line,'dic')
+                        MecabOutsiders[tuple(MecabOutsider.identityattsvals.values())]=MecabOutsider
+                    else:
+                        TmpFSw.write(LiNe)
+            TmpFSw.close()
+            os.rename(TmpFP,RestFP)
+        if MecabWds:
+            sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWds))+' entries\n')
+            myModule.dump_pickle(MecabWds,OutFPStem+'_'+Char)
+        else:
+            sys.stderr.write('nothing found for '+Char+'\n')
+        if CharCntr==0 and MecabOutsiders:
+            sys.stderr.write('Alphabet dic for outsiders done, '+str(len(MecabOutsiders))+' entries\n')
+            myModule.dump_pickle(MecabOutsiders,OutFPStem+'_outsiders')
+    for RestFP in glob.glob(os.path.join(SandboxOutputDir,'*.rest')):
+        os.remove(RestFP)
+
             
 
 def dic_or_corpus(FP):
@@ -239,7 +275,7 @@ def fts2inds(Fts,CorpusOrDic='dic'):
 
 
 
-def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrDic='corpus'):
+def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrDic='corpus',Debug=False):
     from bidict import bidict
     if not Line.strip():
         print('empty line encountered')
@@ -253,12 +289,15 @@ def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrD
     if Line.startswith(','):
         Line=Line.replace(',','、',1)
     LineEls=Line.replace('\t',',').split(',')
+    if DicOrCorpus=='dic':
+        LineEls=LineEls[:1]+LineEls[4:]
     FtCnt=len(LineEls)
     if Fts is None:
         Fts=DefFts
-        sys.stderr.write('we use the default feature set'+'\n')
-        sys.stderr.write(repr(Fts)+'\n')
-        sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
+        if Debug:
+            sys.stderr.write('we use the default feature set'+'\n')
+            sys.stderr.write(repr(Fts)+'\n')
+            sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
     assert(FtCnt==len(Fts) or FtCnt==len(Fts)-2)
     FtCntInLine=len(LineEls)
     RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
@@ -777,7 +816,7 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
     WithCost=False if CorpusOrDic=='corpus' else WithCost
     FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
-    return MecabWdParse(*FtsVals,Costs=Costs)
+    return MecabWdParse(dict(FtsVals),Costs=Costs)
 
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
