@@ -5,7 +5,16 @@ imp.reload(mtools)
 imp.reload(m2j)
 
 
-def main0(FP,PoSTable,DicOrCorpus):
+def main0(OrgResDir,DicCorpus='both',NotRedoObjDic=True):
+    if not OrgResDir:
+        if not os.path.join(OrgResDir,'alphdics'):
+            sys.exit('alphdic dir does not exist')
+        else:
+            mtools.create_indexing_dic(Args.resdir)
+
+    PoSTable=m2j
+
+    
     SeenFtsWds={}
     assert (mtools.dic_or_corpus(FP)==DicOrCorpus)
     with open(FP) as FSr:
@@ -34,16 +43,14 @@ def main():
     import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('resdir')
-    Psr.add_argument('--dic-or-corpus',default='corpus')
+    Psr.add_argument('--not-redo-objdic',default=True)
+    Psr.add_argument('--dic-corpus',default='both')
     Args=Psr.parse_args()
 
     if not os.path.isdir(Args.resdir):
         sys.exit(Args.resdir+' is not dir')
-
-    mtools.create_indexing_dic(Args.resdir)
-    PoSTable=m2j.PoSTable
     
-    main0(Args.fp,PoSTable,Args.dic_or_corpus)
+    main0(Args.resdir,DicCorpus=Args.dic_corpus,NotRedoObjdic=Args.not_redo_objdic)
 
 if __name__=='__main__':
     main()

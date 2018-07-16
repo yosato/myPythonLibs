@@ -28,6 +28,39 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
+def categoryfile2categories(CatFP):
+    CurSuperCat=None
+    SubSuperJ={}
+    SuperSubJ=defaultdict(set)
+    CatCnt=0
+    with open(CatFP) as FSr:
+        for LiNe in FSr:
+            LineR=LiNe.rstrip()
+            if not LineR.lstrip():
+                continue
+            LineEls=LineR.split('\t')
+            if LineEls[0]:
+                CurSuperCat=LineEls[0]
+        #SubSuperJ[LineEls[1]]=CurSuperCat
+            if len(LineEls)>=2:
+                SuperSubJ[CurSuperCat].add(LineEls[1])
+            else:
+                SuperSubJ[CurSuperCat]=set()
+
+    SubSuperJ={};JCatLeaves=[]
+    for (SuperCat,SubCats) in SuperSubJ.items():
+        if SubCats:
+            for SubCat in SubCats:
+                SubSuperJ[SubCat]=SuperCat
+                JCatLeaves.append(SubCat)
+        else:
+            JCatLeaves.append(SuperCat)
+    return JCatLeaves
+
+MecabCatFN='mecabipa_categories.txt'
+MecabCatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools')
+MecabCatFP=os.path.join(MecabCatDir,MecabCatFN)
+MecabIPACats=categoryfile2categories(MecabCatFP)
 
 def create_indexed_dic(DicDir,Lang='jp'):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
