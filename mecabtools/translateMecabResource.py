@@ -5,7 +5,17 @@ imp.reload(mtools)
 imp.reload(m2j)
 
 
-def main0(TgtDicFP,OrgResDir,TgtCatFP,SrcTgtMap,DicCorpus='both',NotRedoObjDic=True):
+def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,DoCorpus=(True,CorpusFP), NotRedoObjDic=True):
+    assert (DoCorpus and CorpusFP) or (not DoCorpus and not CorpusFP)
+    if DoCorpus[0]:
+        assert mtools.dic_or_corpus(CorpusFP)
+
+    translate_dic(OrgResDir,TgtCapFP,SrcTgtMap,OutDir)
+    if DoCorpus:
+        translate_corpus(CorpusFP,OrgResDir+'/alphdics',OutDir+'/alphadics')
+
+def translate_dic(OrgResDir,TgtCapFP,SrcTgtMap,OutDir):
+
     if not OrgResDir:
         if not os.path.join(OrgResDir,'alphdics'):
             sys.exit('alphdic dir does not exist')
@@ -20,34 +30,43 @@ def main0(TgtDicFP,OrgResDir,TgtCatFP,SrcTgtMap,DicCorpus='both',NotRedoObjDic=T
 
     ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,mtools.construct_tree_from_file(TgtCatFP),SrcTgtMap)
     
-    SeenFtsWds={}
-    assert (mtools.dic_or_corpus(FP)==DicOrCorpus)
-
-    for Alph in jp_morph.Katakanas:
+    NewWds={}
+    for Cntr,Alph in enumerate(jp_morph.Katakanas):
         FP=os.path.join(OrgResDir,objdics,SrcODictName+Alph)
         AlphObjDic=myModule.load_pickle(FP)
 
-    with open(FP) as FSr:
-        for LiNe in FSr:
-            if DicOrCorpus=='corpus' and LiNe=='EOS\n':
-                sys.stdout.write(LiNe)
-                continue
-            
-            Line=LiNe.strip()
-            Fts=mtools.pick_feats_fromline(Line,['orth','cat','subcat','lemma','infform','subcat2','reading'],DicOrCorpus=DicOrCorpus)
-            FtsTuple=tuple(Fts)
-            # this is the check of weather it's done already
-            if FtsTuple in SeenFtsWds.keys():
-                JumanWds=SeenFtsWds[FtsTuple]
-                continue
-            Fts=dict(Fts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-            MecabWd=mtools.WordParse(Fts)
-            
-            JumanWds=m2j.mecabwd2jumanwd(MecabWd,PoSTable)
-            SeenFtsWds[FtsTuple]=JumanWds
-            for JumanWd in JumanWds:
-                sys.stdout.write(JumanWd.get_jumanline()+'\n')
-            
+        for (EssentialEls,Wd) in AlphaObjDic:
+            NewWd=translate_word(Wd,ConvTable)
+            NewWds[Essentials]=NewWds
+        
+        dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
+
+        if DicCorpus=='both' and Cntr==0:
+            check_corpus(SampleCorpusFP)
+    
+        
+def translate_corpus(MecabCorpusFP,DstDicDir,DicStem):
+    for Alph in jp_morph.Alphs:
+        DstAlphDicFP=os.path.join(DstDicDir,DicStem+Alph+'.objdic')
+        if os.path.isfile(DstAlphDicFP):
+            DstAlphDic=myModule.load_pickle(DstAlphDicFP)
+        else:
+            sys.stderr.write(OrgAlphDicFP+' is not there\n')
+
+        with open(MecabCorpusFP) as FSr:
+            for LiNe in FSr:
+                Line=LiNe.strip()
+                LineAlph=mtools.extract_alph(Line)
+                if Alph==LineAlph:
+                    IAttsVals=extract_idattsvals(LiNe.strip(),mtools.IdentityAtts)
+                    IVals=IAttsVals.values()
+
+                DstWd=DstAlphDic[IVals] if IVals in DstAlphDic.keys() else reconstruct_word(IVals)
+                Str=DstWd.get_mecabline()
+
+                sys.stdout.write(Str)
+
+
 
 def main():
     import argparse
@@ -55,14 +74,15 @@ def main():
     Psr.add_argument('resdir')
     Psr.add_argument('target_cat_fp')
     Psr.add_argument('src_tgt_mapping')
+    Psr.add_argument('out_dir')
     Psr.add_argument('--not-redo-objdic',default=True)
-    Psr.add_argument('--dic-corpus',default='both')
+    Psr.add_argument('--do-corpus',default=(False,None))
     Args=Psr.parse_args()
 
-    if not os.path.isdir(Args.resdir):
+    if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir,Args.target_cat_fp,Args.src_tgt_mapping,DicCorpus=Args.dic_corpus,NotRedoObjdic=Args.not_redo_objdic)
+    main0(Args.resdir,Args.target_cat_fp,Args.src_tgt_mapping,Args.out_dir,DoCorpus=Args.do_corpus,NotRedoObjdic=Args.not_redo_objdic)
 
 if __name__=='__main__':
     main()
