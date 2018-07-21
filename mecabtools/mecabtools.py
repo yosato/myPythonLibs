@@ -28,39 +28,78 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
-def categoryfile2categories(CatFP):
-    CurSuperCat=None
-    SubSuperJ={}
-    SuperSubJ=defaultdict(set)
-    CatCnt=0
-    with open(CatFP) as FSr:
-        for LiNe in FSr:
+class Tree:
+    def __init__(self,Nodes):
+        self.nodes=Nodes
+        self.topnodes=[Node for Node in Nodes if Node[0] is None]
+        self.middlenodes=[Node for Node in Nodes if Node[0] is not None and Node[1] is not None]
+        self.lastnodes=[Node for Node in Nodes if Node[1] is None]
+        self.indexednodes={Ind:Node for (Ind,Node) in enumerate(Nodes)}
+        self.paths=self.create_paths()
+    def create_paths(self):
+        Paths=[[(Node[1])] for Node in self.topnodes]
+        RemainingNodes=self.middlenodes
+        while RemainingNodes:
+            PathTails=[Path[-1] for Path in Paths]
+            NewPaths=[];CumNextNodes=[]
+            for Path in Paths:
+                NextNodesPerPath=[ Node for Node in RemainingNodes if Node[0]==Path[-1] ]
+                if not NextNodesPerPath:
+                    NewPaths.append(Path)
+                else:
+                    for NextNode in NextNodesPerPath:
+                        NewPaths.append(Path+[NextNode[1]])
+                CumNextNodes.extend(NextNodesPerPath)
+            RemainingNodes=[Node for Node in RemainingNodes if Node not in CumNextNodes]    
+            Paths=NewPaths
+        return [tuple(Path) for Path in Paths]        
+            
+
+def construct_tree_from_file(FP):
+    Nodes=[];Mapping={}
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
             LineR=LiNe.rstrip()
             if not LineR.lstrip():
                 continue
-            LineEls=LineR.split('\t')
-            if LineEls[0]:
-                CurSuperCat=LineEls[0]
-        #SubSuperJ[LineEls[1]]=CurSuperCat
-            if len(LineEls)>=2:
-                SuperSubJ[CurSuperCat].add(LineEls[1])
-            else:
-                SuperSubJ[CurSuperCat]=set()
+            LineElsWithTransMap=LineR.split('\t')
+            LineEls=LineElsWithTransMap[:4]
+            MappingsPerTagSet=LineElsWithTransMap[4:]
+            #print(MappingsPerTagSet)
+            assert (MappingsPerTagSet and all(El[0].isnumeric() for El in MappingsPerTagSet))
+            Mapping[Cntr]=MappingsPerTagSet
+            PrvEl=None
+            for Cntr,LineEl in enumerate(LineEls):
+                if Cntr==0 and LineEl:
+                    SuperCats=[LineEl,None,None,None]
+                    El=LineEl
+                elif LineEl:
+                    SuperCats[Cntr]=LineEl
+                    El=LineEl
+                else:
+                    El=SuperCats[Cntr]
+                Cand=(PrvEl,El)
+                if Cand not in Nodes:
+                    Nodes.append((PrvEl,El))
 
-    SubSuperJ={};JCatLeaves=[]
-    for (SuperCat,SubCats) in SuperSubJ.items():
-        if SubCats:
-            for SubCat in SubCats:
-                SubSuperJ[SubCat]=SuperCat
-                JCatLeaves.append(SubCat)
-        else:
-            JCatLeaves.append(SuperCat)
-    return JCatLeaves
+                PrvEl=El
+    return [Node for Node in Nodes if Node != (None,None)],Mapping
 
 MecabCatFN='mecabipa_categories.txt'
 MecabCatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools')
 MecabCatFP=os.path.join(MecabCatDir,MecabCatFN)
-MecabIPACats=categoryfile2categories(MecabCatFP)
+Nodes,CatMappingWithOtherTagsets=construct_tree_from_file(MecabCatFP)
+MecabIPACats=Tree(Nodes)
+JumanMapping={MecabInd:OtherInds[0] for (MecabInd,OtherInds) in CatMappingWithOtherTagsets.items()}
+
+def create_conversion_table(OrgTree,TgtTree,Mapping,Depth='max'):
+    Table={}
+    for Cntr,Path in enumerate(OrgTree.paths):
+        TgtIndex=Mapping[Cntr+1]
+        Table[Path]=OrgTree.paths[TgtIndex]
+    return Table
+        
+
 
 def create_indexed_dic(DicDir,Lang='jp'):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
