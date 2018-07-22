@@ -55,7 +55,7 @@ class Tree:
         return [tuple(Path) for Path in Paths]        
             
 
-def construct_tree_from_file(FP):
+def construct_tree_from_file(FP,WithMapping=False):
     Nodes=[];Mapping={}
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
@@ -65,9 +65,9 @@ def construct_tree_from_file(FP):
             LineElsWithTransMap=LineR.split('\t')
             LineEls=LineElsWithTransMap[:4]
             MappingsPerTagSet=LineElsWithTransMap[4:]
-            #print(MappingsPerTagSet)
-            assert (MappingsPerTagSet and all(El[0].isnumeric() for El in MappingsPerTagSet))
-            Mapping[Cntr]=MappingsPerTagSet
+            if WithMapping:
+                assert (MappingsPerTagSet and all(El[0].isnumeric() for El in MappingsPerTagSet))
+                Mapping[Cntr+1]=MappingsPerTagSet
             PrvEl=None
             for Cntr,LineEl in enumerate(LineEls):
                 if Cntr==0 and LineEl:
@@ -83,20 +83,25 @@ def construct_tree_from_file(FP):
                     Nodes.append((PrvEl,El))
 
                 PrvEl=El
-    return [Node for Node in Nodes if Node != (None,None)],Mapping
+    myTree= Tree([Node for Node in Nodes if Node != (None,None)])
+    ReturnVal=(myTree,Mapping) if WithMapping else myTree
+    return ReturnVal
 
 MecabCatFN='mecabipa_categories.txt'
 MecabCatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools')
 MecabCatFP=os.path.join(MecabCatDir,MecabCatFN)
-Nodes,CatMappingWithOtherTagsets=construct_tree_from_file(MecabCatFP)
-MecabIPACats=Tree(Nodes)
+MecabIPACats,CatMappingWithOtherTagsets=construct_tree_from_file(MecabCatFP,WithMapping=True)
 JumanMapping={MecabInd:OtherInds[0] for (MecabInd,OtherInds) in CatMappingWithOtherTagsets.items()}
 
 def create_conversion_table(OrgTree,TgtTree,Mapping,Depth='max'):
     Table={}
     for Cntr,Path in enumerate(OrgTree.paths):
-        TgtIndex=Mapping[Cntr+1]
-        Table[Path]=OrgTree.paths[TgtIndex]
+        TgtLinum=Mapping[Cntr+1]
+        if TgtLinum.isnumeric():
+            TgtIndex=int(TgtLinum)-1
+        else:
+            pass
+        Table[Path]=TgtTree.paths[TgtIndex]
     return Table
         
 
