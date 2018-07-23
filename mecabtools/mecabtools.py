@@ -118,7 +118,7 @@ def create_indexed_dic(DicDir,Lang='jp'):
         Copy=os.path.join(SandboxOutputDir,DicFN+'.rest')
         shutil.copy(os.path.join(DicDir,DicFN),Copy)
     MgdDicName=myModule.merge_filenames(DicFNs)
-    OutFPStem=os.path.join(SandboxOutputDir,MgdDicName+'.objdic')
+    OutFPStem=os.path.join(SandboxOutputDir,MgdDicName).replace('.csv','')
     if Lang=='jp':
         Chars=set([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョ')])
     for CharCntr,Char in enumerate(Chars):
@@ -148,7 +148,7 @@ def create_indexed_dic(DicDir,Lang='jp'):
             os.rename(TmpFP,RestFP)
         if MecabWds:
             sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWds))+' entries\n')
-            myModule.dump_pickle(MecabWds,OutFPStem+'_'+Char)
+            myModule.dump_pickle(MecabWds,OutFPStem+'.'+Char+'.objdic')
         else:
             sys.stderr.write('nothing found for '+Char+'\n')
         if CharCntr==0 and MecabOutsiders:

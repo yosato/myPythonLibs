@@ -8,21 +8,24 @@ imp.reload(mtools)
 imp.reload(jp_morph)
 
 
-def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True):
+def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,DoCorpus=False,CorpusFP=None, RedoObjDic=False):
+    if not os.path.isdir(OrgResDir):
+        sys.exit(OrgResDir+' not found')
     assert (DoCorpus and CorpusFP) or (not DoCorpus and not CorpusFP)
     if DoCorpus:
         assert mtools.dic_or_corpus(CorpusFP)=='dic'
 
-    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir)
+    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,RedoObjDic=RedoObjDic)
     if DoCorpus:
         translate_corpus(CorpusFP,OrgResDir+'/alphdics',OutDir+'/alphadics')
 
-def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
-    if not OrgResDir:
-        if not os.path.join(OrgResDir,'alphdics'):
-            sys.exit('alphdic dir does not exist')
-        else:
-            mtools.create_indexing_dic(OrgResDir)
+def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,RedoObjDic=False):
+    ObjDicDir=os.path.join(OrgResDir,'objdics')
+    if not os.path.isdir(ObjDicDir):
+        RedoObjDic=True
+    if RedoObjDic:
+        mtools.create_indexed_dic(OrgResDir)
+
     SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in glob.glob(os.path.join(OrgResDir,'objdics/*.objdic.pickle'))])
 
     if len(SrcODictNames)!=1:
@@ -87,14 +90,14 @@ def main():
     Psr.add_argument('resdir')
     Psr.add_argument('target_cat_fp')
     Psr.add_argument('out_dir')
-    Psr.add_argument('--not-redo-objdic',default=True)
+    Psr.add_argument('--redo-objdic',action='store_true')
     Psr.add_argument('--do-corpus',default=False)
     Args=Psr.parse_args()
 
     if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir, Args.target_cat_fp, mtools.JumanMapping, Args.out_dir, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
+    main0(Args.resdir, Args.target_cat_fp, mtools.JumanMapping, Args.out_dir, DoCorpus=Args.do_corpus, RedoObjDic=Args.redo_objdic)
 
 if __name__=='__main__':
     main()
