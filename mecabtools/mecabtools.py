@@ -93,14 +93,22 @@ MecabCatFP=os.path.join(MecabCatDir,MecabCatFN)
 MecabIPACats,CatMappingWithOtherTagsets=construct_tree_from_file(MecabCatFP,WithMapping=True)
 JumanMapping={MecabInd:OtherInds[0] for (MecabInd,OtherInds) in CatMappingWithOtherTagsets.items()}
 
-def create_conversion_table(OrgTree,TgtTree,Mapping,Depth='max'):
+def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
+    assert ('0id' not in Mapping.values() or IdioDic)
     Table={}
     for Cntr,Path in enumerate(OrgTree.paths):
         TgtLinum=Mapping[Cntr+1]
         if TgtLinum.isnumeric():
             TgtIndex=int(TgtLinum)-1
         else:
-            pass
+            if TgtLinum=='0id':
+                
+            elif '-' in TgtLinum:
+                
+            elif '.' in TgtLinum:
+
+            else:
+                sys.exit('invalid category')
         Table[Path]=TgtTree.paths[TgtIndex]
     return Table
         

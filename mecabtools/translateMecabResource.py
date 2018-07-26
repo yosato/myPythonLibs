@@ -8,7 +8,7 @@ imp.reload(mtools)
 imp.reload(jp_morph)
 
 
-def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True):
+def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,IdioDic=None,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True):
     assert (DoCorpus and CorpusFP) or (not DoCorpus and not CorpusFP)
     if DoCorpus:
         assert mtools.dic_or_corpus(CorpusFP)=='dic'
@@ -88,13 +88,14 @@ def main():
     Psr.add_argument('target_cat_fp')
     Psr.add_argument('out_dir')
     Psr.add_argument('--not-redo-objdic',default=True)
+    Psr.add_argument('--idiodic',default=None)
     Psr.add_argument('--do-corpus',default=False)
     Args=Psr.parse_args()
 
     if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir, Args.target_cat_fp, mtools.JumanMapping, Args.out_dir, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
+    main0(Args.resdir, Args.target_cat_fp, mtools.JumanMapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
 
 if __name__=='__main__':
     main()
