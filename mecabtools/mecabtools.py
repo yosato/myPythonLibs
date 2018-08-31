@@ -4,8 +4,10 @@ from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
 import romkan
 from pythonlib_ys import jp_morph
+import correspondences
 imp.reload(myModule)
 imp.reload(jp_morph)
+imp.reload(correspondences)
 
 try:
     from ipdb import set_trace
@@ -55,8 +57,8 @@ class Tree:
         return [tuple(Path) for Path in Paths]        
             
 
-def construct_tree_from_file(FP,WithMapping=False):
-    Nodes=[];Mapping={}
+def construct_tree_from_file(FP):
+    Nodes=[]
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             LineR=LiNe.rstrip()
@@ -65,9 +67,6 @@ def construct_tree_from_file(FP,WithMapping=False):
             LineElsWithTransMap=LineR.split('\t')
             LineEls=LineElsWithTransMap[:4]
             MappingsPerTagSet=LineElsWithTransMap[4:]
-            if WithMapping:
-                assert (MappingsPerTagSet and all(El[0].isnumeric() for El in MappingsPerTagSet))
-                Mapping[Cntr+1]=MappingsPerTagSet
             PrvEl=None
             for Cntr,LineEl in enumerate(LineEls):
                 if Cntr==0 and LineEl:
@@ -83,32 +82,26 @@ def construct_tree_from_file(FP,WithMapping=False):
                     Nodes.append((PrvEl,El))
 
                 PrvEl=El
-    myTree= Tree([Node for Node in Nodes if Node != (None,None)])
-    ReturnVal=(myTree,Mapping) if WithMapping else myTree
-    return ReturnVal
+    return Tree([Node for Node in Nodes if Node != (None,None)])
+    
 
-MecabCatFN='mecabipa_categories.txt'
-MecabCatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools')
-MecabCatFP=os.path.join(MecabCatDir,MecabCatFN)
-MecabIPACats,CatMappingWithOtherTagsets=construct_tree_from_file(MecabCatFP,WithMapping=True)
-JumanMapping={MecabInd:OtherInds[0] for (MecabInd,OtherInds) in CatMappingWithOtherTagsets.items()}
+MecabCatFN='mecabipa_cats.txt'
+CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')
+MecabCatFP=os.path.join(CatDir,MecabCatFN)
+MecabIPACats=construct_tree_from_file(MecabCatFP)
+Mappings=correspondences.MecabCSJ,correspondences.MecabJuman
+
+MecabCSJMapping=Mappings[0]
+MecabJumanMapping=Mappings[1]
 
 def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
     assert ('0id' not in Mapping.values() or IdioDic)
     Table={}
     for Cntr,Path in enumerate(OrgTree.paths):
-        TgtLinum=Mapping[Cntr+1]
-        if TgtLinum.isnumeric():
-            TgtIndex=int(TgtLinum)-1
-        else:
-            if TgtLinum=='0id':
-                
-            elif '-' in TgtLinum:
-                
-            elif '.' in TgtLinum:
+        TgtLinums=next(Nums2 for (Nums1,Nums2) in Mapping.items() if Cntr+1 in Nums1)
+        if len(TgtLinums)==1:
+            TgtIndex=TgtLinums[0]-1
 
-            else:
-                sys.exit('invalid category')
         Table[Path]=TgtTree.paths[TgtIndex]
     return Table
         

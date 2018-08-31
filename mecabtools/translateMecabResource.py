@@ -23,7 +23,7 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
             sys.exit('alphdic dir does not exist')
         else:
             mtools.create_indexing_dic(OrgResDir)
-    SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in glob.glob(os.path.join(OrgResDir,'objdics/*.objdic.pickle'))])
+    SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))])
 
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
@@ -85,17 +85,22 @@ def main():
     import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('resdir')
-    Psr.add_argument('target_cat_fp')
+    Psr.add_argument('target_scheme')
     Psr.add_argument('out_dir')
     Psr.add_argument('--not-redo-objdic',default=True)
     Psr.add_argument('--idiodic',default=None)
     Psr.add_argument('--do-corpus',default=False)
     Args=Psr.parse_args()
 
+    assert(Args.target_scheme in ('csj','juman'))
+
+    TagDir=os.path.join(os.getcwd(),'tagsets')
+    (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if Args.target_scheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
+
     if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir, Args.target_cat_fp, mtools.JumanMapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
+    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
 
 if __name__=='__main__':
     main()
