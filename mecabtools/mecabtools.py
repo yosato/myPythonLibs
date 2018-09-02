@@ -33,35 +33,47 @@ DinasourPats=('ラ変','文語','四段','下二','上二')
 class Tree:
     def __init__(self,Nodes):
         self.nodes=Nodes
-        self.topnodes=[Node for Node in Nodes if Node[0] is None]
+        self.startnodes=[Node for Node in Nodes if Node[0] is None]
+        self.heads=[Node[1] for Node in self.startnodes ]
         self.middlenodes=[Node for Node in Nodes if Node[0] is not None and Node[1] is not None]
-        self.lastnodes=[Node for Node in Nodes if Node[1] is None]
+        self.terminals=[Node[0] for Node in Nodes if Node[1] is None]
         self.indexednodes={Ind:Node for (Ind,Node) in enumerate(Nodes)}
         self.paths=self.create_paths()
-    def create_paths(self):
-        Paths=[[(Node[1])] for Node in self.topnodes]
-        RemainingNodes=self.middlenodes
-        while RemainingNodes:
-            PathTails=[Path[-1] for Path in Paths]
-            NewPaths=[];CumNextNodes=[]
-            for Path in Paths:
-                NextNodesPerPath=[ Node for Node in RemainingNodes if Node[0]==Path[-1] ]
-                if not NextNodesPerPath:
-                    NewPaths.append(Path)
+    def next_nodes_fromtail(self,Tail):
+        Terminals=[];Nonterminals=[]
+        for Node in self.nodes:
+            if Tail==Node[0]:
+                if Node[1] is None:
+                    Terminals.append(Node)
                 else:
-                    for NextNode in NextNodesPerPath:
-                        NewPaths.append(Path+[NextNode[1]])
-                CumNextNodes.extend(NextNodesPerPath)
-            RemainingNodes=[Node for Node in RemainingNodes if Node not in CumNextNodes]    
-            Paths=NewPaths
-        return [tuple(Path) for Path in Paths]        
+                    Nonterminals.append(Node)
+        return Terminals, Nonterminals        
+    def create_paths(self):
+        def extend_path(Path):
+            NodesPair=self.next_nodes_fromtail(Path[-1])
+            return [ [ Path.append(Node) for Node in Nodes ] for Nodes in NodesPair ]
+        def extend_multipaths(Paths):
+            Terminals=[];Nonterminals=[]
+            for Path in Paths:
+                TermPerPath,NTermPerPath=extend_path(Path)
+                Terminals.extend(TermPerPath)
+                Nonterminals.extend(NTermPerPath)
+            return Terminals,Nonterminals
+        
+        #(IntPaths,CompPaths)=next_nodes(self.startnodes)
+        IntPaths=[ [Head] for Head in self.heads ]
+        Fst=True
+        while IntPaths:
+            IntNodes,TermNodes=extend_multipaths(IntPaths)
+
+        return CompPaths
             
 
 def construct_tree_from_file(FP):
     Nodes=[]
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
-            LineR=LiNe.rstrip()
+            LineR=re.sub(r'#.+$','',LiNe).rstrip()
             if not LineR.lstrip():
                 continue
             LineElsWithTransMap=LineR.split('\t')
@@ -77,20 +89,39 @@ def construct_tree_from_file(FP):
                     El=LineEl
                 else:
                     El=SuperCats[Cntr]
-                Cand=(PrvEl,El)
-                if Cand not in Nodes:
-                    Nodes.append((PrvEl,El))
+                Cands=[(PrvEl,El)]
+                if Cntr==len(LineEls)-1:
+                    Cands.append((El,None))
+                for Cand in Cands:
+                    if Cand not in Nodes:
+                        Nodes.append(Cand)
 
                 PrvEl=El
-    return Tree([Node for Node in Nodes if Node != (None,None)])
-    
+    Nodes=[Node for Node in Nodes if Node != (None,None)]
+    return Tree(Nodes)
 
 MecabCatFN='mecabipa_cats.txt'
 CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')
 MecabCatFP=os.path.join(CatDir,MecabCatFN)
 MecabIPACats=construct_tree_from_file(MecabCatFP)
+CatCnt=len(MecabIPACats.paths)
 Mappings=correspondences.MecabCSJ,correspondences.MecabJuman
 
+def continuous_p(Ints):
+    Bool=True
+    for Cntr,Int in enumerate(Ints):
+        if Cntr!=0 and abs(PrvInt-Int)!=1:
+            Bool=False
+            break
+        PrvInt=Int
+    return Bool
+    
+
+for Mapping in Mappings:
+    OrderedKeyList=sorted(myModule.flatten_list(Mapping.keys()))
+    assert(continuous_p(OrderedKeyList))
+    assert(OrderedKeyList[-1]==CatCnt)
+    
 MecabCSJMapping=Mappings[0]
 MecabJumanMapping=Mappings[1]
 
@@ -99,10 +130,8 @@ def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
     Table={}
     for Cntr,Path in enumerate(OrgTree.paths):
         TgtLinums=next(Nums2 for (Nums1,Nums2) in Mapping.items() if Cntr+1 in Nums1)
-        if len(TgtLinums)==1:
-            TgtIndex=TgtLinums[0]-1
-
-        Table[Path]=TgtTree.paths[TgtIndex]
+        TgtIndices=[Num-1 for Num in TgtLinums]
+        Table[Path]=[TgtTree.paths[TgtIndex] for TgtIndex in TgtIndices]
     return Table
         
 
