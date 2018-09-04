@@ -160,7 +160,13 @@ def expand_product(L1,L2):
 InfCats=['助動詞','動詞','形容詞']
 
 GojuonStrH='あいうえお\nかきくけこ\nさしすせそ\nたちつてと\nなにぬねの\nはひふへほ\nまみむめも\nやいゆえよ\nらりるれろ\nわいうえを\nがぎぐげご\nざじずぜぞ\nだぢづでど\nばびぶべぼ\nぱぴぷぺぽ\nゃぃゅぇょ\nぁぃぅぇぉ'
-GojuonStrK='アイウエオ\nカキクケコ\nサシスセソ\nタチツテト\nナニヌネノ\nハヒフヘホ\nマミムメモ\nヤイユエヨ\nラリルレロ\nワイウエヲ\nガギグゲゴ\nザジズゼゾ\nダヂヅデド\nバビブベボ\nパピプペポ\nャィュェョ\nァィゥェォ'
+
+GojuonStrKLarge='アイウエオ\nカキクケコ\nサシスセソ\nタチツテト\nナニヌネノ\nハヒフヘホ\nマミムメモ\nヤイユエヨ\nラリルレロ\nワイウエヲ\nガギグゲゴ\nザジズゼゾ\nダヂヅデド\nバビブベボ\nパピプペポ'
+
+GojuonStrKSmall='ャィュェョ\nァィゥェォ'
+
+GojuonStrK=GojuonStrKLarge+'\n'+GojuonStrKSmall
+
 GojuonStrR='aiueo\nkakikukeko\nsasisuseso\tatituteto\naninuneno\nhahihuheho\nmamimumemo\nyayiyuyeyo\nwawiwuwewo\ngagigugego\nzazizuzezo\ndadidudedo\nbabibubebo\npapipupepo\nyayiyuyeyo\naiueo'
 
 GojuonDic={'んン':{'N':('ん','ン')},'っッ':{'t':('っ','ッ')}}

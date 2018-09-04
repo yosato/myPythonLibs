@@ -23,21 +23,22 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
             sys.exit('alphdic dir does not exist')
         else:
             mtools.create_indexing_dic(OrgResDir)
-    SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))])
+
+    ODictFPs=glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))
+    SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in ODictFPs])
 
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
     SrcODictName=SrcODictNames.pop()
     
-    JumanCats=mtools.construct_tree_from_file(TgtCatFP)
-    ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,JumanCats,SrcTgtMap)
+    TgtCats=mtools.construct_tree_from_file(TgtCatFP)
+    ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
     
     NewWds={}
-    for Cntr,Alph in enumerate(jp_morph.GojuonStrLargeH):
-        FP=os.path.join(OrgResDir,'objdics',SrcODictName+Alph)
+    for Cntr,FP in enumerate(ODictFPs):
         AlphObjDic=myModule.load_pickle(FP)
 
-        for (EssentialEls,Wd) in AlphObjDic:
+        for (EssentialEls,Wd) in AlphObjDic.items():
             NewWd=translate_word(Wd,ConvTable)
             NewWds[EssentialEls]=NewWd
         

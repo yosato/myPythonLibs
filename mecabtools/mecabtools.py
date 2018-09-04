@@ -31,80 +31,99 @@ IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
 class Tree:
-    def __init__(self,Nodes):
-        self.nodes=Nodes
-        self.startnodes=[Node for Node in Nodes if Node[0] is None]
-        self.heads=[Node[1] for Node in self.startnodes ]
-        self.middlenodes=[Node for Node in Nodes if Node[0] is not None and Node[1] is not None]
-        self.terminals=[Node[0] for Node in Nodes if Node[1] is None]
-        self.indexednodes={Ind:Node for (Ind,Node) in enumerate(Nodes)}
-        self.paths=self.create_paths()
-    def next_nodes_fromtail(self,Tail):
-        Terminals=[];Nonterminals=[]
+    def __init__(self,CompPaths):
+        self.comppaths=CompPaths
+
+    def is_path(self,PathCand):
+        if not type(PathCand).__name__=='list':
+            return False
+        if not PathCand[0][0] is None:
+            return False
+        if not all((type(Node).__name__=='tuple') for Node in PathCand):
+            return False
+        return True
+    
+    def complete_path_p(self,Path):
+        return Path[-1][-1] is None
+
+    def next_nodes(self,CurNode):
+        NextNodes=[]
         for Node in self.nodes:
-            if Tail==Node[0]:
-                if Node[1] is None:
-                    Terminals.append(Node)
-                else:
-                    Nonterminals.append(Node)
-        return Terminals, Nonterminals        
+            if CurNode[1]==Node[0]:
+                NextNodes.append(Node)
+        return NextNodes
+    def classify_paths(self,Paths):
+        Complete=[];Int=[]
+        for Path in Paths:
+            if self.complete_path_p(Path):
+                Complete.append(Path)
+            else:
+                Int.append(Path)
+        return Complete, Int
+
     def create_paths(self):
         def extend_path(Path):
-            NodesPair=self.next_nodes_fromtail(Path[-1])
-            return [ [ Path.append(Node) for Node in Nodes ] for Nodes in NodesPair ]
+            NextNodes=self.next_nodes(Path[-1])
+            NewPaths=[Path+[NextNode] for NextNode in NextNodes]
+            assert(all(self.is_path(NewPath) for NewPath in NewPaths))
+            return NewPaths
+
         def extend_multipaths(Paths):
-            Terminals=[];Nonterminals=[]
+            NewPaths=[]
             for Path in Paths:
-                TermPerPath,NTermPerPath=extend_path(Path)
-                Terminals.extend(TermPerPath)
-                Nonterminals.extend(NTermPerPath)
-            return Terminals,Nonterminals
+                NewPaths.extend(extend_path(Path))
+            return NewPaths
         
         #(IntPaths,CompPaths)=next_nodes(self.startnodes)
-        IntPaths=[ [Head] for Head in self.heads ]
+        IntPaths=[ [Node] for Node in self.startnodes ]
+        CompPaths=[]
         Fst=True
         while IntPaths:
-            IntNodes,TermNodes=extend_multipaths(IntPaths)
+            NewPaths=extend_multipaths(IntPaths)
+            NewCompPaths,IntPaths=self.classify_paths(NewPaths)
+            CompPaths.extend(NewCompPaths)
 
         return CompPaths
             
 
+def count_head_charrep(TgtChar,Str):
+    Cnt=0
+    for Char in Str:
+        if Char==TgtChar:
+            Cnt+=1
+        else:
+            break
+    return Cnt
+
 def construct_tree_from_file(FP):
-    Nodes=[]
+    Nodes=[];PrvLevel=0;FullPaths=[]
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             LineR=re.sub(r'#.+$','',LiNe).rstrip()
             if not LineR.lstrip():
                 continue
-            LineElsWithTransMap=LineR.split('\t')
-            LineEls=LineElsWithTransMap[:4]
-            MappingsPerTagSet=LineElsWithTransMap[4:]
-            PrvEl=None
-            for Cntr,LineEl in enumerate(LineEls):
-                if Cntr==0 and LineEl:
-                    SuperCats=[LineEl,None,None,None]
-                    El=LineEl
-                elif LineEl:
-                    SuperCats[Cntr]=LineEl
-                    El=LineEl
+            LineEls=LineR.split('\t')
+            Level=count_head_charrep('',LineEls)
+            if Level==0:
+                CurSuperCats=LineEls
+            elif Level>=PrvLevel:
+                if len(CurSuperCats)<=Level:
+                    CurSuperCats.append(LineEls[Level])
                 else:
-                    El=SuperCats[Cntr]
-                Cands=[(PrvEl,El)]
-                if Cntr==len(LineEls)-1:
-                    Cands.append((El,None))
-                for Cand in Cands:
-                    if Cand not in Nodes:
-                        Nodes.append(Cand)
-
-                PrvEl=El
-    Nodes=[Node for Node in Nodes if Node != (None,None)]
-    return Tree(Nodes)
+                    CurSuperCats[Level]=LineEls[Level]
+            elif Level<PrvLevel:
+                CurSuperCats=CurSuperCats[:Level]+LineEls[Level:]
+            FullPaths.append(tuple(CurSuperCats[:Level]+[LineEl for LineEl in LineEls if LineEl]))
+#            print(FullPaths)
+            PrvLevel=Level
+            
+    return Tree(FullPaths)
 
 MecabCatFN='mecabipa_cats.txt'
 CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')
 MecabCatFP=os.path.join(CatDir,MecabCatFN)
 MecabIPACats=construct_tree_from_file(MecabCatFP)
-CatCnt=len(MecabIPACats.paths)
+CatCnt=len(MecabIPACats.comppaths)
 Mappings=correspondences.MecabCSJ,correspondences.MecabJuman
 
 def continuous_p(Ints):
@@ -117,7 +136,7 @@ def continuous_p(Ints):
     return Bool
     
 
-for Mapping in Mappings:
+for Mapping in [Mappings[0]]:
     OrderedKeyList=sorted(myModule.flatten_list(Mapping.keys()))
     assert(continuous_p(OrderedKeyList))
     assert(OrderedKeyList[-1]==CatCnt)
@@ -128,10 +147,10 @@ MecabJumanMapping=Mappings[1]
 def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
     assert ('0id' not in Mapping.values() or IdioDic)
     Table={}
-    for Cntr,Path in enumerate(OrgTree.paths):
+    for Cntr,Path in enumerate(OrgTree.comppaths):
         TgtLinums=next(Nums2 for (Nums1,Nums2) in Mapping.items() if Cntr+1 in Nums1)
         TgtIndices=[Num-1 for Num in TgtLinums]
-        Table[Path]=[TgtTree.paths[TgtIndex] for TgtIndex in TgtIndices]
+        Table[Path]=[TgtTree.comppaths[TgtIndex] for TgtIndex in TgtIndices]
     return Table
         
 
