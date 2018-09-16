@@ -686,7 +686,12 @@ class MecabWdParse(WordParse):
             Suffix=self.get_prototype(FtsVals=[('orth',Suffix),('lemma',Suffix), ('infform',self.infform), ('cat','活用語尾'), ('pronunciation',KatakanaSuffix)])
         
         return Stem,Suffix
-
+    def populated_catfeats(self):
+        PopulatedCatFeats=[self.cat]
+        for Feat in (self.subcat,self.subcat2,self.sem):
+            if Feat!='*':
+                PopulatedCatFeats.append(Feat)
+        return tuple(PopulatedCatFeats)
     
     def divide_stem_suffix(self):
         if self.cat=='動詞':

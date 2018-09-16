@@ -1,4 +1,4 @@
-import imp,sys,os,re,glob
+import imp,sys,os,re,glob,copy
 #import mecab2juman as m2j
 from pythonlib_ys import jp_morph
 from pythonlib_ys import main as myModule
@@ -13,11 +13,11 @@ def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,IdioDic=None,DoCorpus=False,Corpus
     if DoCorpus:
         assert mtools.dic_or_corpus(CorpusFP)=='dic'
 
-    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir)
+    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec='csj')
     if DoCorpus:
         translate_corpus(CorpusFP,OrgResDir+'/alphdics',OutDir+'/alphadics')
 
-def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
+def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec):
     if not OrgResDir:
         if not os.path.join(OrgResDir,'alphdics'):
             sys.exit('alphdic dir does not exist')
@@ -39,7 +39,7 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
         AlphObjDic=myModule.load_pickle(FP)
 
         for (EssentialEls,Wd) in AlphObjDic.items():
-            NewWd=translate_word(Wd,ConvTable)
+            NewWd=translate_word(Wd,ConvTable,TgtSpec)
             NewWds[EssentialEls]=NewWd
         
         myModule.dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
@@ -47,18 +47,58 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir):
 #        if DoCorpus and Cntr==0:
 #            check_corpus(SampleCorpusFP)
 
-def translate_word(Wd,ConvTable,MaxLevel=None):
-    TgtCats=ConvTable[Wd.populated_catfeats()]
-    IndsCats={0:'cat',1:'subcat',2:'subcat2',3:'sem'}
+def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4):
+    Feats=Wd.populated_catfeats()
+    TgtCats=CatConvTable[Feats][0]
+    OrgCats=('cat','subcat','subcat2','sem')
     NewAttsVals={}
-    for Cntr,TgtCat in enumerate(TgtCats):
-        if Cntr+1>MaxLevel:
+    for Ind,Cat in enumerate(OrgCats):
+        if Ind+1>MaxLevel:
             break
         else:
-            NewAttsVals[IndsCats[Cntr]]=TgtCat
-    NewWd=Wd.change_feats(NewAttsVals)
+            if Ind+1<=len(TgtCats):
+                NewAttsVals[Cat]=TgtCats[Ind]
+            else:
+                NewAttsVals[Cat]='*'
+    NewAttsVals['infform']=translate_infform(Wd.infform,TgtSpec)
+    NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
+    NewAttsVals['infpat']=NewPat
+    NewWd=copy.deepcopy(Wd)
+    NewWd.change_feats(NewAttsVals)
     return NewWd
-        
+
+def translate_infform(MInfF,TgtSpec='csj'):
+    FstTwo=MInfF[:2]
+    if FstTwo in ('連用','仮定','命令','基本'):
+        NewMInf=('終止' if FstTwo=='基本' else FstTwo)+'形'
+    elif FstTwo=='未然':
+        NewMInf='未然形' if NewMInf=='未然形' else '未然形４'
+    elif FstTwo=='体言':
+        NewMInf='連体形'
+    return NewMInf
+    
+    
+    
+
+def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
+    SpecialNote=None
+    DanGyo=MInfP.split('・')
+    assert(len(DanGyo)<=2)
+    Dan=DanGyo[0]
+    Gyo=None if not DanGyo[1:] else DanGyo[1]
+    if Dan=='一段':
+        NewDan='下一段' if jp_morph.identify_dan(lemma[-2])=='e' else '上一段'
+    else:
+        NewDan=Dan
+    if Dan=='カ変' or Dan=='サ変':
+        NewGyo=None
+    else:
+        NewGyo=Gyo[:2]
+        if len(Gyo)>=3:
+            SpecialNote=Dan[2:]
+    NewDanGyo=Gyo+Dan
+    return NewDanGyo,SpecialNote
+
 def translate_corpus(MecabCorpusFP,DstDicDir,DicStem):
     for Alph in jp_morph.Alphs:
         DstAlphDicFP=os.path.join(DstDicDir,DicStem+Alph+'.objdic')
