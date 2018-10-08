@@ -34,37 +34,59 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec):
     TgtCats=mtools.construct_tree_from_file(TgtCatFP)
     ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
     
-    NewWds={}
+    NewWds={};Seen=set()
     for Cntr,FP in enumerate(ODictFPs):
+        Alph=FP.split('.')[-3]
         AlphObjDic=myModule.load_pickle(FP)
 
-        for (EssentialEls,Wd) in AlphObjDic.items():
-            NewWd=translate_word(Wd,ConvTable,TgtSpec)
-            NewWds[EssentialEls]=NewWd
-        
+        for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
+            try:
+                NewWd=translate_word(Wd,ConvTable,TgtSpec)
+            except:
+                NewWd=None
+                translate_word(Wd,ConvTable,TgtSpec)
+            if NewWd:
+                NewEssentialVals=tuple([ NewWd.__dict__[Att] for Att in NewWd.identityatts ])
+                if NewEssentialVals not in Seen:
+                    NewWds[NewEssentialVals]=NewWd
+                    Seen.add(NewEssentialVals)
+            else:
+                sys.stderr.write('non-translatable\n'+repr(Wd.__dict__))
+        OrgWdCnt=WdCntr+1
+        Lost=OrgWdCnt-len(NewWds)
+        sys.stderr.write('\n'+str(Lost)+' wds out of '+str(OrgWdCnt)+' lost\n')
         myModule.dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
+        
 
 #        if DoCorpus and Cntr==0:
 #            check_corpus(SampleCorpusFP)
 
 def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4):
     Feats=Wd.populated_catfeats()
+    if Feats not in CatConvTable.keys():
+        return None
     TgtCats=CatConvTable[Feats][0]
     OrgCats=('cat','subcat','subcat2','sem')
-    NewAttsVals={}
-    for Ind,Cat in enumerate(OrgCats):
-        if Ind+1>MaxLevel:
-            break
-        else:
-            if Ind+1<=len(TgtCats):
-                NewAttsVals[Cat]=TgtCats[Ind]
-            else:
-                NewAttsVals[Cat]='*'
-    NewAttsVals['infform']=translate_infform(Wd.infform,TgtSpec)
+    NewInfF=translate_infform(Wd.infform,TgtSpec)
     NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
-    NewAttsVals['infpat']=NewPat
-    NewWd=copy.deepcopy(Wd)
-    NewWd.change_feats(NewAttsVals)
+
+    NewAttsVals={}
+    if NewInfF and NewPat:
+        NewAttsVals['infform']=NewInfF
+        NewAttsVals['infpat']=NewPat
+        NewWd=copy.deepcopy(Wd)
+        NewWd.change_feats(NewAttsVals)
+
+        for Ind,Cat in enumerate(OrgCats):
+            if Ind+1>MaxLevel:
+                break
+            else:
+                if Ind+1<=len(TgtCats):
+                    NewAttsVals[Cat]=TgtCats[Ind]
+                else:
+                    NewAttsVals[Cat]='*'
+    else:
+        NewWd=None
     return NewWd
 
 def translate_infform(MInfF,TgtSpec='csj'):
@@ -72,13 +94,13 @@ def translate_infform(MInfF,TgtSpec='csj'):
     if FstTwo in ('連用','仮定','命令','基本'):
         NewMInf=('終止' if FstTwo=='基本' else FstTwo)+'形'
     elif FstTwo=='未然':
-        NewMInf='未然形' if NewMInf=='未然形' else '未然形４'
+        NewMInf='未然形' if MInfF=='未然形' else '未然形４'
     elif FstTwo=='体言':
         NewMInf='連体形'
+    else:
+        NewMInf=None
     return NewMInf
-    
-    
-    
+
 
 def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     SpecialNote=None
@@ -86,17 +108,22 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     assert(len(DanGyo)<=2)
     Dan=DanGyo[0]
     Gyo=None if not DanGyo[1:] else DanGyo[1]
-    if Dan=='一段':
-        NewDan='下一段' if jp_morph.identify_dan(lemma[-2])=='e' else '上一段'
-    else:
-        NewDan=Dan
-    if Dan=='カ変' or Dan=='サ変':
-        NewGyo=None
+    if Gyo is None:
+        NewGyo=''
+        if Dan=='一段':
+            if len(Lemma)<2:
+                return None, None
+            NewDan='下一段' if jp_morph.identify_dan(Lemma[-2])=='e' else '上一段'
+        else:
+            NewDan=Dan
+    elif Dan=='カ変' or Dan=='サ変':
+        NewGyo='';NewDan=Dan
     else:
         NewGyo=Gyo[:2]
+        NewDan=Dan
         if len(Gyo)>=3:
             SpecialNote=Dan[2:]
-    NewDanGyo=Gyo+Dan
+    NewDanGyo=NewGyo+NewDan
     return NewDanGyo,SpecialNote
 
 def translate_corpus(MecabCorpusFP,DstDicDir,DicStem):

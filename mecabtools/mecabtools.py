@@ -534,10 +534,11 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'},IdentityAtts={'cat','orth','infform'}):
+    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'},IdentityAtts=('cat','orth','infform')):
         super().__init__(AVPairs)
         self.inherentatts=self.inherentatts.union(InhAtts)
-        self.identityattsvals={K:V for (K,V) in AVPairs.items() if K in IdentityAtts}
+        self.identityatts=IdentityAtts
+        self.identityattsvals=self.get_identityattsvals()
         if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
          
@@ -547,7 +548,12 @@ class MecabWdParse(WordParse):
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
-
+    def change_feats(self,AttsVals):
+        super().change_feats(AttsVals)
+        self.identityatts=('cat','orth','infform')
+        self.identityattsvals=self.get_identityattsvals()
+    def get_identityattsvals(self):     
+        return {K:self.__dict__[K] for K in self.identityatts}
     def same_type(self,AnotherWd):
         return self.identityattsvals==AnotherWd.identityattsvals
     
