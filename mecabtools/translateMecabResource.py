@@ -1,4 +1,5 @@
-import imp,sys,os,re,glob,copy
+import imp,sys,os,re,glob,copy,time
+from collections import defaultdict
 #import mecab2juman as m2j
 from pythonlib_ys import jp_morph
 from pythonlib_ys import main as myModule
@@ -8,16 +9,16 @@ imp.reload(mtools)
 imp.reload(jp_morph)
 
 
-def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,IdioDic=None,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True):
+def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,IdioDic=None,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True,Debug=False):
     assert (DoCorpus and CorpusFP) or (not DoCorpus and not CorpusFP)
     if DoCorpus:
         assert mtools.dic_or_corpus(CorpusFP)=='dic'
 
-    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec='csj')
+    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec='csj',Debug=Debug)
     if DoCorpus:
         translate_corpus(CorpusFP,OrgResDir+'/alphdics',OutDir+'/alphadics')
 
-def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec):
+def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
     if not OrgResDir:
         if not os.path.join(OrgResDir,'alphdics'):
             sys.exit('alphdic dir does not exist')
@@ -39,21 +40,21 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec):
         Alph=FP.split('.')[-3]
         AlphObjDic=myModule.load_pickle(FP)
 
+        Errors=defaultdict(list)
         for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
-            try:
-                NewWd=translate_word(Wd,ConvTable,TgtSpec)
-            except:
-                NewWd=None
-                translate_word(Wd,ConvTable,TgtSpec)
-            if NewWd:
+            NewWd=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
+            if type(NewWd).__name__=='tuple':
+                ErrCode=NewWd[1]
+                Errors[ErrCode].append(Wd)
+
+            elif NewWd:
                 NewEssentialVals=tuple([ NewWd.__dict__[Att] for Att in NewWd.identityatts ])
                 if NewEssentialVals not in Seen:
                     NewWds[NewEssentialVals]=NewWd
                     Seen.add(NewEssentialVals)
-            else:
-                sys.stderr.write('non-translatable\n'+repr(Wd.__dict__))
+
         OrgWdCnt=WdCntr+1
-        Lost=OrgWdCnt-len(NewWds)
+        Lost=OrgWdCnt-sum(len(List) for ErrCat,List in Errors.items())
         sys.stderr.write('\n'+str(Lost)+' wds out of '+str(OrgWdCnt)+' lost\n')
         myModule.dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
         
@@ -61,15 +62,22 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec):
 #        if DoCorpus and Cntr==0:
 #            check_corpus(SampleCorpusFP)
 
-def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4):
+def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
     Feats=Wd.populated_catfeats()
     if Feats not in CatConvTable.keys():
-        return None
+        if Debug:
+            sys.stderr.write(repr(Feats)+' not found in table\n')
+            sys.stderr.write(repr(Wd.__dict__)+'\n')
+            time.sleep(5)
+        return None,0
     TgtCats=CatConvTable[Feats][0]
     OrgCats=('cat','subcat','subcat2','sem')
     NewInfF=translate_infform(Wd.infform,TgtSpec)
+    if not NewInfF:
+        return None,1
     NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
-
+    if not NewPat:
+        return None,2
     NewAttsVals={}
     if NewInfF and NewPat:
         NewAttsVals['infform']=NewInfF
@@ -85,8 +93,6 @@ def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4):
                     NewAttsVals[Cat]=TgtCats[Ind]
                 else:
                     NewAttsVals[Cat]='*'
-    else:
-        NewWd=None
     return NewWd
 
 def translate_infform(MInfF,TgtSpec='csj'):
@@ -157,7 +163,9 @@ def main():
     Psr.add_argument('out_dir')
     Psr.add_argument('--not-redo-objdic',default=True)
     Psr.add_argument('--idiodic',default=None)
-    Psr.add_argument('--do-corpus',default=False)
+    Psr.add_argument('--do-corpus',default=False)    
+    Psr.add_argument('--debug',action='store_true')
+
     Args=Psr.parse_args()
 
     assert(Args.target_scheme in ('csj','juman'))
@@ -168,7 +176,7 @@ def main():
     if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic)
+    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
 
 if __name__=='__main__':
     main()
