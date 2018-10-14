@@ -8,15 +8,25 @@ imp.reload(mtools)
 #imp.reload(m2j)
 imp.reload(jp_morph)
 
+def convtable_check(ConvTable):
+    for MecabCat,TgtCats in ConvTable.items():
+        sys.stderr.write(repr(MecabCat)+': ')
+        for TgtCat in TgtCats:
+            sys.stderr.write(repr(TgtCat)+'\n')
 
-def main0(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,IdioDic=None,DoCorpus=False,CorpusFP=None, NotRedoObjDic=True,Debug=False):
-    assert (DoCorpus and CorpusFP) or (not DoCorpus and not CorpusFP)
-    if DoCorpus:
-        assert mtools.dic_or_corpus(CorpusFP)=='dic'
+def main0(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,Debug=False):
+    if CorpusDir:
+        CorpusFPs=glob.glob(CorpusDir+'*')
+        
+        assert all(mtools.dic_or_corpus(CorpusFP)=='dic' for CorpusFP in CorpusFPs)
 
-    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec='csj',Debug=Debug)
-    if DoCorpus:
-        translate_corpus(CorpusFP,OrgResDir+'/alphdics',OutDir+'/alphadics')
+    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir,TgtSpec='csj',Debug=Debug)
+    
+    if CorpusDir:
+        CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans'
+        for CorpusFP in CorpusFPs:
+            OutFP=os.path.join(CorpusOutDir,CorpusFP)
+            translate_corpus(CorpusFP,DicOutDir,OutFP)
 
 def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
     if not OrgResDir:
@@ -27,73 +37,95 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
 
     ODictFPs=glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))
     SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in ODictFPs])
-
+    
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
     SrcODictName=SrcODictNames.pop()
+    if OutDir is None:
+        OutDir=re.sub('/$','',OrgResDir)+'_trans'
+        if not os.path.isdir(OutDir):
+            os.makedirs(OutDir)
     
     TgtCats=mtools.construct_tree_from_file(TgtCatFP)
     ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
+    if Debug:
+        convtable_check(ConvTable)
     
-    NewWds={};Seen=set()
     for Cntr,FP in enumerate(ODictFPs):
         Alph=FP.split('.')[-3]
         AlphObjDic=myModule.load_pickle(FP)
 
         Errors=defaultdict(list)
+        NewWds={};Dups=defaultdict(list);ECnt=0
         for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
-            NewWd=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
-            if type(NewWd).__name__=='tuple':
-                ErrCode=NewWd[1]
-                Errors[ErrCode].append(Wd)
-
-            elif NewWd:
+            NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
+            if ErrorCode:
+                Errors[ErrorCode].append(Wd)
+#                ECnt+=1
+ #               LostCnt=sum(len(List) for ErrCat,List in Errors.items())
+  #              assert(ECnt==LostCnt)
+            else:
                 NewEssentialVals=tuple([ NewWd.__dict__[Att] for Att in NewWd.identityatts ])
-                if NewEssentialVals not in Seen:
+                if NewEssentialVals in NewWds.keys():
+                    Dups[NewEssentialVals].append(WdCntr)
+                else:
                     NewWds[NewEssentialVals]=NewWd
-                    Seen.add(NewEssentialVals)
 
         OrgWdCnt=WdCntr+1
-        Lost=OrgWdCnt-sum(len(List) for ErrCat,List in Errors.items())
-        sys.stderr.write('\n'+str(Lost)+' wds out of '+str(OrgWdCnt)+' lost\n')
+        LostCnt=sum(len(List) for ErrCat,List in Errors.items())
+        assert(OrgWdCnt==len(NewWds)+LostCnt+len(Dups))
+        sys.stderr.write('\nDic for "'+Alph+'", '+str(OrgWdCnt)+' wds processed, ('+str(len(Dups))+' dups) '+str(LostCnt)+' wds lost\n')
         myModule.dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
         
-
 #        if DoCorpus and Cntr==0:
 #            check_corpus(SampleCorpusFP)
 
 def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
+    InfCats=['動詞','形容詞','助動詞']
     Feats=Wd.populated_catfeats()
     if Feats not in CatConvTable.keys():
         if Debug:
             sys.stderr.write(repr(Feats)+' not found in table\n')
             sys.stderr.write(repr(Wd.__dict__)+'\n')
             time.sleep(5)
-        return None,0
+        return None,'convtable'
     TgtCats=CatConvTable[Feats][0]
     OrgCats=('cat','subcat','subcat2','sem')
-    NewInfF=translate_infform(Wd.infform,TgtSpec)
-    if not NewInfF:
-        return None,1
-    NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
-    if not NewPat:
-        return None,2
-    NewAttsVals={}
-    if NewInfF and NewPat:
-        NewAttsVals['infform']=NewInfF
-        NewAttsVals['infpat']=NewPat
-        NewWd=copy.deepcopy(Wd)
-        NewWd.change_feats(NewAttsVals)
-
-        for Ind,Cat in enumerate(OrgCats):
-            if Ind+1>MaxLevel:
-                break
+    if Wd.cat in InfCats:
+        (NewInfPat,NewInfForm)=process_yogen(Wd,TgtSpec)
+        if any(Var is None for Var in (NewInfPat,NewInfForm)):
+            if NewInfPat is None and NewInfForm is None:
+                ErrorCode='infboth'
+            elif NewInfPat is None:
+                ErrorCode='infpat'
             else:
-                if Ind+1<=len(TgtCats):
-                    NewAttsVals[Cat]=TgtCats[Ind]
-                else:
-                    NewAttsVals[Cat]='*'
-    return NewWd
+                ErrorCode='infform'
+            return None,ErrorCode
+    else:
+        assert(Wd.infform=='*' and Wd.infpat=='*')
+        NewInfForm='*';NewInfPat='*'
+        
+    NewAttsVals={}
+    NewAttsVals['infform']=NewInfForm
+    NewAttsVals['infpat']=NewInfPat
+    NewWd=copy.deepcopy(Wd)
+    NewWd.change_feats(NewAttsVals)
+    
+    for Ind,Cat in enumerate(OrgCats):
+        if Ind+1>MaxLevel:
+            break
+        else:
+            if Ind+1<=len(TgtCats):
+                NewAttsVals[Cat]=TgtCats[Ind]
+            else:
+                NewAttsVals[Cat]='*'
+    return NewWd,None
+
+def process_yogen(Wd,TgtSpec):    
+    NewInfF=translate_infform(Wd.infform,TgtSpec)
+    NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
+    return NewPat,NewInfF
+
 
 def translate_infform(MInfF,TgtSpec='csj'):
     FstTwo=MInfF[:2]
@@ -160,10 +192,10 @@ def main():
     Psr=argparse.ArgumentParser()
     Psr.add_argument('resdir')
     Psr.add_argument('target_scheme')
-    Psr.add_argument('out_dir')
+    Psr.add_argument('--out-dir',default=None)
     Psr.add_argument('--not-redo-objdic',default=True)
     Psr.add_argument('--idiodic',default=None)
-    Psr.add_argument('--do-corpus',default=False)    
+    Psr.add_argument('--corpus-dir',default=None)    
     Psr.add_argument('--debug',action='store_true')
 
     Args=Psr.parse_args()
@@ -173,10 +205,10 @@ def main():
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if Args.target_scheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
-    if not os.path.isdir(Args.resdir) or not os.path.isdir(Args.out_dir):
+    if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)):
         sys.exit(Args.resdir+' is not dir')
     
-    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, DoCorpus=Args.do_corpus, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
+    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
 
 if __name__=='__main__':
     main()

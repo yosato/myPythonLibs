@@ -150,7 +150,7 @@ def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
     for Cntr,Path in enumerate(OrgTree.comppaths):
         TgtLinums=next(Nums2 for (Nums1,Nums2) in Mapping.items() if Cntr+1 in Nums1)
         TgtIndices=[Num-1 for Num in TgtLinums]
-        Table[Path]=[TgtTree.comppaths[TgtIndex] for TgtIndex in TgtIndices]
+        Table[Path]=[TgtTree.comppaths[TgtIndices[0]]]
     return Table
         
 
