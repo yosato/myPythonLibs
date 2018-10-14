@@ -16,11 +16,15 @@ def convtable_check(ConvTable):
 
 def main0(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,Debug=False):
     if CorpusDir:
-        CorpusFPs=glob.glob(CorpusDir+'*')
-        
-        assert all(mtools.dic_or_corpus(CorpusFP)=='dic' for CorpusFP in CorpusFPs)
+        CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
 
-    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir,TgtSpec='csj',Debug=Debug)
+        for CorpusFP in CorpusFPs:
+            if mtools.dic_or_corpus(CorpusFP)!='corpus':
+                sys.exit(CorpusFP+' not corpus')
+            
+        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
+
+#    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir,TgtSpec='csj',Debug=Debug)
     
     if CorpusDir:
         CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans'
@@ -205,8 +209,8 @@ def main():
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if Args.target_scheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
-    if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)):
-        sys.exit(Args.resdir+' is not dir')
+    if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)) or (Args.corpus_dir and not os.path.isdir(Args.corpus_dir)):
+        sys.exit('non dir specified for a dir')
     
     main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
 

@@ -206,16 +206,42 @@ def create_indexed_dic(DicDir,Lang='jp'):
     for RestFP in glob.glob(os.path.join(SandboxOutputDir,'*.rest')):
         os.remove(RestFP)
 
-            
+
+def mecabline_p(Line):
+    return ',' in Line
+    
+def corpusline_p(Line):
+    if not mecabline_p(Line):
+        return False
+    return Line=='EOS' or '\t'
+
+def dicline_p(Line):
+    if not mecabline_p(Line):
+        return False
+    else:
+        return True
 
 def dic_or_corpus(FP):
+    RealLineCnt=0
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
+            Line=LiNe.strip()
+            if not Line:
+                continue
+            else:
+                RealLineCnt+=1
+            if RealLineCnt==0:
+                if dicline_p(Line):
+                    DorC='dic'
+                elif corpusline_p(Line):
+                    DorC='corpus'
+                else:
+                    return None
             if Cntr>100:
                 break
             else:
-                if '\t' in LiNe:
-                    return 'corpus'
+                
+
                 else:
                     return 'dic'
 
