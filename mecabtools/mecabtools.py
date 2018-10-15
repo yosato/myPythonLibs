@@ -208,18 +208,18 @@ def create_indexed_dic(DicDir,Lang='jp'):
 
 
 def mecabline_p(Line):
-    return ',' in Line
+    return ',' in Line or Line=='EOS'
     
 def corpusline_p(Line):
     if not mecabline_p(Line):
         return False
-    return Line=='EOS' or '\t'
+    return Line=='EOS' or '\t' in Line
 
 def dicline_p(Line):
     if not mecabline_p(Line):
         return False
     else:
-        return True
+        return ',' in Line and '\t' not in Line
 
 def dic_or_corpus(FP):
     RealLineCnt=0
@@ -230,20 +230,24 @@ def dic_or_corpus(FP):
                 continue
             else:
                 RealLineCnt+=1
-            if RealLineCnt==0:
-                if dicline_p(Line):
-                    DorC='dic'
-                elif corpusline_p(Line):
+            if RealLineCnt==1:
+                if corpusline_p(Line):
                     DorC='corpus'
+                elif dicline_p(Line):
+                    DorC='dic'
                 else:
+                    sys.stderr.write('offending line: 1st\n\n')
                     return None
-            if Cntr>100:
+            elif RealLineCnt>100:
                 break
             else:
-                
-
-                else:
-                    return 'dic'
+                if DorC=='corpus' and not corpusline_p(Line):
+                    sys.stderr.write('offending line: '+Line+'\n')
+                    return None
+                elif DorC=='dic' and not dicline_p(Line):
+                    sys.stderr.write('offending line: '+Line+'\n')
+                    return None
+    return DorC
 
 def get_line(FP,LiNum):
     with open(FP) as FSr:

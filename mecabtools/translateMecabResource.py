@@ -14,22 +14,32 @@ def convtable_check(ConvTable):
         for TgtCat in TgtCats:
             sys.stderr.write(repr(TgtCat)+'\n')
 
-def main0(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,Debug=False):
+def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,Strict=False,Debug=False):
+
+    TagDir=os.path.join(os.getcwd(),'tagsets')
+    (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
+
     if CorpusDir:
         CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
-
+        ProblemFiles=[]
         for CorpusFP in CorpusFPs:
             if mtools.dic_or_corpus(CorpusFP)!='corpus':
-                sys.exit(CorpusFP+' not corpus')
+                ProblemFiles.append(CorpusFP)
+        if ProblemFiles:
+            sys.stderr.write('problem corpus files '+repr(ProblemFiles)+'\n')
+            if Strict:
+                sys.exit()
+            else:
+                CorpusFPs=list(set(CorpusFPs)-set(ProblemFiles))
             
-        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
+#        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
 
 #    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir,TgtSpec='csj',Debug=Debug)
     
     if CorpusDir:
-        CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans'
+        CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans_'+TgtScheme
         for CorpusFP in CorpusFPs:
-            OutFP=os.path.join(CorpusOutDir,CorpusFP)
+            OutFP=myModule.change_ext(os.path.join(CorpusOutDir,CorpusFP),TgtScheme)
             translate_corpus(CorpusFP,DicOutDir,OutFP)
 
 def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
@@ -168,13 +178,10 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     NewDanGyo=NewGyo+NewDan
     return NewDanGyo,SpecialNote
 
-def translate_corpus(MecabCorpusFP,DstDicDir,DicStem):
-    for Alph in jp_morph.Alphs:
-        DstAlphDicFP=os.path.join(DstDicDir,DicStem+Alph+'.objdic')
-        if os.path.isfile(DstAlphDicFP):
-            DstAlphDic=myModule.load_pickle(DstAlphDicFP)
-        else:
-            sys.stderr.write(OrgAlphDicFP+' is not there\n')
+def translate_corpus(MecabCorpusFP,ObjDicDir):
+    ObjDics=glob.glob(DicDir+'/*.pickle')
+    for ObjDic in ObjDics:
+        
 
         with open(MecabCorpusFP) as FSr:
             for LiNe in FSr:
@@ -206,13 +213,10 @@ def main():
 
     assert(Args.target_scheme in ('csj','juman'))
 
-    TagDir=os.path.join(os.getcwd(),'tagsets')
-    (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if Args.target_scheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
-
     if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)) or (Args.corpus_dir and not os.path.isdir(Args.corpus_dir)):
         sys.exit('non dir specified for a dir')
     
-    main0(Args.resdir, TgtCatFP, Mapping, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
+    main0(Args.resdir, Args.target_scheme, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
 
 if __name__=='__main__':
     main()
