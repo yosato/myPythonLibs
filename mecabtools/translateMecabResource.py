@@ -179,17 +179,22 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     return NewDanGyo,SpecialNote
 
 def translate_corpus(MecabCorpusFP,ObjDicDir):
-    ObjDics=glob.glob(DicDir+'/*.pickle')
-    for ObjDic in ObjDics:
-        
+    ObjDicFPs=glob.glob(DicDir+'/*.pickle')
+    DicEssAtts=set()
+    for ObjDicFP in ObjDicFPs:
+        ObjDic=myModule.load_pickle(ObjDicFP)
+        DicEssAtts.add(ObjDic.keys())
 
-        with open(MecabCorpusFP) as FSr:
-            for LiNe in FSr:
-                Line=LiNe.strip()
-                LineAlph=mtools.extract_alph(Line)
-                if Alph==LineAlph:
-                    IAttsVals=extract_idattsvals(LiNe.strip(),mtools.IdentityAtts)
-                    IVals=IAttsVals.values()
+    with open(MecabCorpusFP) as FSr:
+        CorpusEssAtts=extract_essentialatts_from_corpus(MecabCorpus)
+        CorpusEssAtts.union(DicEssAtts)
+
+        for LiNe in FSr:
+            Line=LiNe.strip()
+            LineAlph=mtools.extract_alph(Line)
+            if Alph==LineAlph:
+                IAttsVals=extract_idattsvals(LiNe.strip(),mtools.IdentityAtts)
+                IVals=IAttsVals.values()
 
                 DstWd=DstAlphDic[IVals] if IVals in DstAlphDic.keys() else reconstruct_word(IVals)
                 Str=DstWd.get_mecabline()
