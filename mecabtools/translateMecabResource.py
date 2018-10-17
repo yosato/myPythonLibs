@@ -19,6 +19,11 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
+    if DicOutDir is None:
+        DicOutDir=re.sub('/$','',OrgResDir)+'_trans'
+        if not os.path.isdir(DicOutDir):
+            os.makedirs(DicOutDir)
+
     if CorpusDir:
         CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
         ProblemFiles=[]
@@ -40,7 +45,7 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
         CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans_'+TgtScheme
         for CorpusFP in CorpusFPs:
             OutFP=myModule.change_ext(os.path.join(CorpusOutDir,CorpusFP),TgtScheme)
-            translate_corpus(CorpusFP,DicOutDir,OutFP)
+            translate_corpus(CorpusFP,DicOutDir)
 
 def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
     if not OrgResDir:
@@ -55,10 +60,6 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
     SrcODictName=SrcODictNames.pop()
-    if OutDir is None:
-        OutDir=re.sub('/$','',OrgResDir)+'_trans'
-        if not os.path.isdir(OutDir):
-            os.makedirs(OutDir)
     
     TgtCats=mtools.construct_tree_from_file(TgtCatFP)
     ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
@@ -179,7 +180,7 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     return NewDanGyo,SpecialNote
 
 def translate_corpus(MecabCorpusFP,ObjDicDir):
-    ObjDicFPs=glob.glob(DicDir+'/*.pickle')
+    ObjDicFPs=glob.glob(ObjDicDir+'/*.pickle')
     DicEssAtts=set()
     for ObjDicFP in ObjDicFPs:
         ObjDic=myModule.load_pickle(ObjDicFP)
