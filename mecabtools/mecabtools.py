@@ -20,6 +20,7 @@ Debug=0
 HomeDir=os.getenv('HOME')
 
 DefFts=['orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation']
+DefFtsSmall=DefFts[:8]
 DefIndsFts={Ind:Ft for (Ind,Ft) in enumerate(DefFts)}
 DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
 DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
@@ -336,26 +337,29 @@ def create_newdic_mapping(SrcIAValsInds,SrcFts,SubsumptionType,TgtDics,IdentityA
      
 
  
-def extract_identityattvals(ResFPs,Type,SrcFts,IdentityAtts):
+def extract_identityattvals(ResFP,Type,IdentityAtts,SrcFts=None):
+    IdentityAtts=tuple(IdentityAtts)
     assert Type=='dic' or Type=='corpus'
-    assert type(SrcFts).__name__=='list'
+    #SrcFts=DefFts if SrcFts is None else SrcFts
     IAttsInds=defaultdict(list)
     if Type=='corpus':
         Seen=set()
-    for ResFP in ResFPs:
-        with open(ResFP) as FSr:
-            for Ind,LiNe in enumerate(FSr):
-                if Type=='corpus' and LiNe=='EOS\n':
-                    continue
-                WdFts=line2wdfts(LiNe.strip(),CorpusOrDic=Type,Fts=SrcFts)
-                IdentityAttVals=tuple([Val for (Att,Val) in WdFts if Att in IdentityAtts])              
-                if Type=='corpus':
-                    if IdentityAtts not in Seen:
-                        Seen.add(IdentityAttVals)
-                        IAttsInds[IdentityAttVals].append(Ind)
-                else:
+    with open(ResFP) as FSr:
+        for Ind,LiNe in enumerate(FSr):
+            if Type=='corpus' and LiNe=='EOS\n':
+                continue
+            WdFts=line2wdfts(LiNe.strip(),CorpusOrDic=Type,Fts=SrcFts)
+            IdentityAttVals=[]
+            for IdAtt in IdentityAtts:
+                IdentityAttVals.append(WdFts[IdAtt])
+            IdentityAttVals=tuple(IdentityAttVals)
+            if Type=='corpus':
+                if IdentityAtts not in Seen:
+                    Seen.add(IdentityAttVals)
                     IAttsInds[IdentityAttVals].append(Ind)
-    return IAttsInds
+            else:
+                IAttsInds[IdentityAttVals].append(Ind)
+    return {IAtt:tuple(Inds) for (IAtt,Inds) in IAttsInds.items()}
     
 
 
@@ -564,9 +568,9 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts={'orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'},IdentityAtts=('cat','orth','infform')):
+    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('cat','orth','infform')):
         super().__init__(AVPairs)
-        self.inherentatts=self.inherentatts.union(InhAtts)
+        self.inherentatts=InhAtts
         self.identityatts=IdentityAtts
         self.identityattsvals=self.get_identityattsvals()
         if self.cat=='動詞' or self.cat=='形容詞':
@@ -935,6 +939,7 @@ class MecabWdParse(WordParse):
             return self.get_mecabdicline()
         
         Orth=self.orth
+        self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
         FtStrs=[]
         for Ft in self.inherentatts[1:]:
             FtStrs.append(str(self.__dict__[Ft]))
@@ -985,7 +990,7 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
     return MecabWdParse(dict(FtsVals),Costs=Costs)
 
-def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=False):
+def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
     assert CorpusOrDic in ['dic','corpus']
     assert TupleOrDict in ['dict','tuple']
@@ -994,7 +999,6 @@ def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=F
     if CorpusOrDic=='dic': 
         assert '\t' not in Line
     
-    Fts=DefFts if not Fts else Fts
     if CorpusOrDic=='corpus':
         WdFtStrPlusNote=Line.strip().split('\t')
         Wd=WdFtStrPlusNote[0]
@@ -1008,6 +1012,10 @@ def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='tuple',Fts=None,WithCost=F
             Costs=tuple([int(Str) for Str in WdFts[1:4]])
         else:
             Costs=None
+
+    if Fts is None:
+        Fts=(DefFtsSmall if len(Vals)==8 else DefFts)
+            
     assert(len(Fts)==len(Vals))
     FtsVals=list(zip(Fts,Vals))
     if TupleOrDict=='dict':
