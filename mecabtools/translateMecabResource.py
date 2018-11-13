@@ -14,15 +14,24 @@ def convtable_check(ConvTable):
         for TgtCat in TgtCats:
             sys.stderr.write(repr(TgtCat)+'\n')
 
-def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,Strict=False,Debug=False):
+def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,MakeTextDicToo=False,Strict=False,Debug=False):
 
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
     if DicOutDir is None:
-        DicOutDir=re.sub('/$','',OrgResDir)+'_trans'
+        DicOutDir=re.sub('/$','',OrgResDir)+'_trans_'+TgtScheme
         if not os.path.isdir(DicOutDir):
             os.makedirs(DicOutDir)
+    ODicOutDir=os.path.join(DicOutDir,'objdics')
+    if not os.path.isdir(ODicOutDir):
+        os.makedirs(ODicOutDir)
+    if not MakeTextDicToo:
+        TDicOutDir=None
+    else:
+        TDicOutDir=os.path.join(DicOutDir,'textdics')
+        if not os.path.isdir(TDicOutDir):
+            os.makedirs(TDicOutDir)
 
     if CorpusDir:
         CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
@@ -37,9 +46,9 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
             else:
                 CorpusFPs=list(set(CorpusFPs)-set(ProblemFiles))
             
-#        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
+        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
 
-#    translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,DicOutDir,TgtSpec='csj',Debug=Debug)
+    translate_dic(OrgResDir,TgtCatFP,Mapping,ODicOutDir,TDicOutDir=TDicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo)
     
     if CorpusDir:
         CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans_'+TgtScheme
@@ -47,7 +56,7 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
             OutFP=myModule.change_ext(os.path.join(CorpusOutDir,CorpusFP),TgtScheme)
             translate_corpus(CorpusFP,DicOutDir)
 
-def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
+def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,TDicOutDir=None,MakeTextDicToo=False,Debug=False):
     if not OrgResDir:
         if not os.path.join(OrgResDir,'alphdics'):
             sys.exit('alphdic dir does not exist')
@@ -73,7 +82,7 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
         Errors=defaultdict(list)
         NewWds={};Dups=defaultdict(list);ECnt=0
         for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
-            NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
+            NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,NewInhAtts=('orth','cat','subcat','lemma','infpat','infform','reading'),Debug=Debug)
             if ErrorCode:
                 Errors[ErrorCode].append(Wd)
 #                ECnt+=1
@@ -90,12 +99,20 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,Debug=False):
         LostCnt=sum(len(List) for ErrCat,List in Errors.items())
         assert(OrgWdCnt==len(NewWds)+LostCnt+len(Dups))
         sys.stderr.write('\nDic for "'+Alph+'", '+str(OrgWdCnt)+' wds processed, ('+str(len(Dups))+' dups) '+str(LostCnt)+' wds lost\n')
-        myModule.dump_pickle(NewWds,os.path.join(OutDir,SrcODictName+'_'+Alph+'.objdic'))
+        FNStem=SrcODictName+'_'+Alph
+        myModule.dump_pickle(NewWds,os.path.join(OutDir,FNStem+'.objdic'))
+        if TDicOutDir:
+            output_textdic(NewWds,os.path.join(TDicOutDir,FNStem+'.textdic'))
         
 #        if DoCorpus and Cntr==0:
 #            check_corpus(SampleCorpusFP)
 
-def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
+def output_textdic(Dict,FP):
+    with open(FP,'wt') as FSw:
+        for Wd in Dict.values():
+            FSw.write(Wd.get_mecabline()+'\n')
+
+def translate_word(Wd,CatConvTable,TgtSpec,NewInhAtts=None,MaxLevel=4,Debug=False):
     InfCats=['動詞','形容詞','助動詞']
     Feats=Wd.populated_catfeats()
     if Feats not in CatConvTable.keys():
@@ -125,6 +142,8 @@ def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
     NewAttsVals['infpat']=NewInfPat
     NewWd=copy.deepcopy(Wd)
     NewWd.change_feats(NewAttsVals)
+    if NewInhAtts:
+        NewWd.inhatts=NewInhAtts
     
     for Ind,Cat in enumerate(OrgCats):
         if Ind+1>MaxLevel:
@@ -180,27 +199,32 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     return NewDanGyo,SpecialNote
 
 def translate_corpus(MecabCorpusFP,ObjDicDir):
+    CorpusEssAttsLines=mtools.extract_identityattvals(MecabCorpusFP,'corpus',['cat','lemma','infform'])
+    CorpusEssAtts=set(CorpusEssAttsLines.keys())
     ObjDicFPs=glob.glob(ObjDicDir+'/*.pickle')
-    DicEssAtts=set()
+    FndWds={}
     for ObjDicFP in ObjDicFPs:
         ObjDic=myModule.load_pickle(ObjDicFP)
-        DicEssAtts.add(ObjDic.keys())
-
+        for DicEssAtt in ObjDic.keys():
+            if DicEssAtt in CorpusEssAtts:
+                FndWds[CorpusEssAttsLines[DicEssAtt]]=ObjDic[DicEssAtt]
+        
     with open(MecabCorpusFP) as FSr:
-        CorpusEssAtts=extract_essentialatts_from_corpus(MecabCorpus)
-        CorpusEssAtts.union(DicEssAtts)
+        for Cntr,LiNe in enumerate(FSr):
+            if LiNe=='EOS\n':
+                TransWdStr=LiNe.strip()
+            else:
+                WdIfFnd=next((Wd for (Inds,Wd) in FndWds.items() if Cntr in Inds), None)
+                if WdIfFnd is None:
+                    TransWdStr=fallback_trans('FALLBACK\t'+LiNe.strip())
+                else:
+                    TransWdStr=WdIfFnd.get_mecabline()
 
-        for LiNe in FSr:
-            Line=LiNe.strip()
-            LineAlph=mtools.extract_alph(Line)
-            if Alph==LineAlph:
-                IAttsVals=extract_idattsvals(LiNe.strip(),mtools.IdentityAtts)
-                IVals=IAttsVals.values()
-
-                DstWd=DstAlphDic[IVals] if IVals in DstAlphDic.keys() else reconstruct_word(IVals)
-                Str=DstWd.get_mecabline()
-
-                sys.stdout.write(Str)
+            sys.stdout.write(TransWdStr+'\n')
+            
+def fallback_trans(Line):
+    return Line
+    
 
 
 
@@ -212,7 +236,8 @@ def main():
     Psr.add_argument('--out-dir',default=None)
     Psr.add_argument('--not-redo-objdic',default=True)
     Psr.add_argument('--idiodic',default=None)
-    Psr.add_argument('--corpus-dir',default=None)    
+    Psr.add_argument('--corpus-dir',default=None)
+    Psr.add_argument('--textdic-too',action='store_true')
     Psr.add_argument('--debug',action='store_true')
 
     Args=Psr.parse_args()
@@ -222,7 +247,7 @@ def main():
     if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)) or (Args.corpus_dir and not os.path.isdir(Args.corpus_dir)):
         sys.exit('non dir specified for a dir')
     
-    main0(Args.resdir, Args.target_scheme, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,Debug=Args.debug)
+    main0(Args.resdir, Args.target_scheme, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,MakeTextDicToo=Args.textdic_too,Debug=Args.debug)
 
 if __name__=='__main__':
     main()
