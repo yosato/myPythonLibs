@@ -15,7 +15,20 @@ def convtable_check(ConvTable):
             sys.stderr.write(repr(TgtCat)+'\n')
 
 def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,MakeTextDicToo=False,Strict=False,Debug=False):
-
+    def validate_corpora(CorpusDir):
+        CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
+        ProblemFiles=[]
+        for CorpusFP in CorpusFPs:
+            if mtools.dic_or_corpus(CorpusFP)!='corpus':
+                ProblemFiles.append(CorpusFP)
+        if ProblemFiles:
+            sys.stderr.write('problem corpus files '+repr(ProblemFiles)+'\n')
+            if Strict:
+                sys.exit()
+            else:
+                CorpusFPs=list(set(CorpusFPs)-set(ProblemFiles))
+        return CorpusFPs
+    
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
@@ -34,18 +47,7 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
             os.makedirs(TDicOutDir)
 
     if CorpusDir:
-        CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
-        ProblemFiles=[]
-        for CorpusFP in CorpusFPs:
-            if mtools.dic_or_corpus(CorpusFP)!='corpus':
-                ProblemFiles.append(CorpusFP)
-        if ProblemFiles:
-            sys.stderr.write('problem corpus files '+repr(ProblemFiles)+'\n')
-            if Strict:
-                sys.exit()
-            else:
-                CorpusFPs=list(set(CorpusFPs)-set(ProblemFiles))
-            
+        CorpusFPs=validate_corpora(CorpusDir)
         assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
 
     translate_dic(OrgResDir,TgtCatFP,Mapping,ODicOutDir,TDicOutDir=TDicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo)
@@ -82,7 +84,7 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,TDicOutDir=None,Ma
         Errors=defaultdict(list)
         NewWds={};Dups=defaultdict(list);ECnt=0
         for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
-            NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,NewInhAtts=('orth','cat','subcat','lemma','infpat','infform','reading'),Debug=Debug)
+            NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
             if ErrorCode:
                 Errors[ErrorCode].append(Wd)
 #                ECnt+=1
@@ -112,7 +114,13 @@ def output_textdic(Dict,FP):
         for Wd in Dict.values():
             FSw.write(Wd.get_mecabline()+'\n')
 
-def translate_word(Wd,CatConvTable,TgtSpec,NewInhAtts=None,MaxLevel=4,Debug=False):
+
+
+    
+        
+    
+def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
+    InhAttsTable={'csj':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)],'juman':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)]}
     InfCats=['動詞','形容詞','助動詞']
     Feats=Wd.populated_catfeats()
     if Feats not in CatConvTable.keys():
@@ -124,7 +132,7 @@ def translate_word(Wd,CatConvTable,TgtSpec,NewInhAtts=None,MaxLevel=4,Debug=Fals
     TgtCats=CatConvTable[Feats][0]
     OrgCats=('cat','subcat','subcat2','sem')
     if Wd.cat in InfCats:
-        (NewInfPat,NewInfForm)=process_yogen(Wd,TgtSpec)
+        (NewInfPat,NewInfForm,PhoneAssim)=process_yogen(Wd,TgtSpec)
         if any(Var is None for Var in (NewInfPat,NewInfForm)):
             if NewInfPat is None and NewInfForm is None:
                 ErrorCode='infboth'
@@ -142,8 +150,10 @@ def translate_word(Wd,CatConvTable,TgtSpec,NewInhAtts=None,MaxLevel=4,Debug=Fals
     NewAttsVals['infpat']=NewInfPat
     NewWd=copy.deepcopy(Wd)
     NewWd.change_feats(NewAttsVals)
-    if NewInhAtts:
-        NewWd.inhatts=NewInhAtts
+
+    InhAttsValsToAdd={'hello':'hello'} if TgtSpec=='juman' else {'phoneassim':PhoneAssim}
+    NewWd.change_feats(InhAttsValsToAdd)
+    NewWd.replace_inherentatts(InhAttsTable[TgtSpec][0])
     
     for Ind,Cat in enumerate(OrgCats):
         if Ind+1>MaxLevel:
@@ -155,11 +165,15 @@ def translate_word(Wd,CatConvTable,TgtSpec,NewInhAtts=None,MaxLevel=4,Debug=Fals
                 NewAttsVals[Cat]='*'
     return NewWd,None
 
-def process_yogen(Wd,TgtSpec):    
+def process_yogen(Wd,TgtSpec):
     NewInfF=translate_infform(Wd.infform,TgtSpec)
     NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
-    return NewPat,NewInfF
+    PhoneAssim=identify_phoneassim(Wd) if (NewInfF=='連用形' and NewPat=='五段') else None 
+    return NewPat,NewInfF,PhoneAssim
 
+def identify_phoneassim(Wd):
+    OnbinsGyos={'イ音便':{'k','g'},'撥音便':{'m','n'},'促音便':{'t','r','w'}}
+    return next((Onbin for Onbin in OnbinsGyos.keys() if jp_morph.identify_gyo(Wd.lemma) in OnbingGyos[Onbin]),None)
 
 def translate_infform(MInfF,TgtSpec='csj'):
     FstTwo=MInfF[:2]

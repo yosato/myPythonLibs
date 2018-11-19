@@ -582,6 +582,13 @@ class MecabWdParse(WordParse):
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
+
+    def replace_inherentatts(self,NewInhAtts):
+        if type(NewInhAtts).__name__!='tuple':
+            sys.exit('new inh atts need to be a tuple')
+        if any(NewInhAtt in self.inherentatts for NewInhAtt in NewInhAtts):
+            sys.exit('you are trying to add a new feat already in inh atts')
+        self.inherentatts=NewInhAtts
     def change_feats(self,AttsVals):
         super().change_feats(AttsVals)
         self.identityatts=('cat','orth','infform')
@@ -939,7 +946,7 @@ class MecabWdParse(WordParse):
             return self.get_mecabdicline()
         
         Orth=self.orth
-        self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
+        #self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
         FtStrs=[]
         for Ft in self.inherentatts[1:]:
             FtStrs.append(str(self.__dict__[Ft]))
