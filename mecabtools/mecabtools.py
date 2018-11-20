@@ -586,8 +586,9 @@ class MecabWdParse(WordParse):
     def replace_inherentatts(self,NewInhAtts):
         if type(NewInhAtts).__name__!='tuple':
             sys.exit('new inh atts need to be a tuple')
-        if any(NewInhAtt in self.inherentatts for NewInhAtt in NewInhAtts):
-            sys.exit('you are trying to add a new feat already in inh atts')
+        NewAtts=[NewInhAtt for NewInhAtt in self.inherentatts if NewInhAtt not in NewInhAtts]
+#        if NewAtts:
+ #           sys.stderr.write('[WARNING] new inhatt, '+repr(NewAtts))
         self.inherentatts=NewInhAtts
     def change_feats(self,AttsVals):
         super().change_feats(AttsVals)
@@ -949,7 +950,9 @@ class MecabWdParse(WordParse):
         #self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
         FtStrs=[]
         for Ft in self.inherentatts[1:]:
-            FtStrs.append(str(self.__dict__[Ft]))
+            Val=self.__dict__[Ft]
+            FtStr='*' if Val is None else str(Val) 
+            FtStrs.append(FtStr)
         FtStr=','.join(FtStrs)
 #            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
  #           FtsNonEmpty=[ Ft for Ft in Fts if Ft ]

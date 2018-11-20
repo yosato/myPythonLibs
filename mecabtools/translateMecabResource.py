@@ -120,7 +120,7 @@ def output_textdic(Dict,FP):
         
     
 def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
-    InhAttsTable={'csj':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)],'juman':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)]}
+    InhAttsTable={'csj':[('orth','cat','subcat','phoneassim','infform','infpat','lemma','reading'),(3,)],'juman':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)]}
     InfCats=['動詞','形容詞','助動詞']
     Feats=Wd.populated_catfeats()
     if Feats not in CatConvTable.keys():
@@ -143,7 +143,7 @@ def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
             return None,ErrorCode
     else:
         assert(Wd.infform=='*' and Wd.infpat=='*')
-        NewInfForm='*';NewInfPat='*'
+        NewInfForm='*';NewInfPat='*';PhoneAssim='*'
         
     NewAttsVals={}
     NewAttsVals['infform']=NewInfForm
