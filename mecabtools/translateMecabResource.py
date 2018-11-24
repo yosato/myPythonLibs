@@ -15,19 +15,6 @@ def convtable_check(ConvTable):
             sys.stderr.write(repr(TgtCat)+'\n')
 
 def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,MakeTextDicToo=False,Strict=False,Debug=False):
-    def validate_corpora(CorpusDir):
-        CorpusFPs=glob.glob(os.path.join(CorpusDir,'*.mecab'))
-        ProblemFiles=[]
-        for CorpusFP in CorpusFPs:
-            if mtools.dic_or_corpus(CorpusFP)!='corpus':
-                ProblemFiles.append(CorpusFP)
-        if ProblemFiles:
-            sys.stderr.write('problem corpus files '+repr(ProblemFiles)+'\n')
-            if Strict:
-                sys.exit()
-            else:
-                CorpusFPs=list(set(CorpusFPs)-set(ProblemFiles))
-        return CorpusFPs
     
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
@@ -47,8 +34,7 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
             os.makedirs(TDicOutDir)
 
     if CorpusDir:
-        CorpusFPs=validate_corpora(CorpusDir)
-        assert all(mtools.dic_or_corpus(CorpusFP)=='corpus' for CorpusFP in CorpusFPs)
+        CorpusFPs=mtools.validate_corpora_dics_indir(CorpusDir)
 
     translate_dic(OrgResDir,TgtCatFP,Mapping,ODicOutDir,TDicOutDir=TDicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo)
     

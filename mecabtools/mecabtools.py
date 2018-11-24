@@ -154,6 +154,21 @@ def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
         Table[Path]=[TgtTree.comppaths[TgtIndices[0]]]
     return Table
         
+def validate_corpora_dics_indir(Dir,Strict=False):
+        CDFPs={'corpus':glob.glob(os.path.join(Dir,'*.mecab')),'dic':glob.glob(os.path.join(Dir,'*.csv'))}
+        ProbFiles={'corpus':[],'dic':[]}
+        for CorD,FPs in CDFPs.items():
+            for FP in FPs:
+                if dic_or_corpus(FP)!=CorD:
+                    ProbFiles[CorD].append(FP)
+        for CorD,FPs in ProbFiles.items():
+            if FPs:
+                sys.stderr.write('problem '+CorD+' files '+repr(ProbFiles)+'\n')
+            if Strict:
+                sys.exit()
+            else:
+                CDFPs[CorD]=list(set(CDFPs[CorD])-set(FPs))
+        return CDFPs
 
 
 def create_indexed_dic(DicDir,Lang='jp'):
