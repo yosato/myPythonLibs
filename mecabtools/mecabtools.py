@@ -172,20 +172,31 @@ def validate_corpora_dics_indir(Dir,Strict=False):
 
 
 def create_indexed_dic(DicDir,Lang='jp'):
+    CharWithRelatives=jp_morph.CharWithRelatives
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
     assert DicFPs
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
     SandboxOutputDir=os.path.join(DicDir,'objdics')
     if not os.path.isdir(SandboxOutputDir):
         os.makedirs(SandboxOutputDir)
+    else:
+        Files=glob.glob(SandboxOutputDir+'/*')
+        if Files:
+            Answer=myModule.prompt_loop_bool('files exist in the dir, which are to be deleted. Is that okay?')
+            if Answer=='no':
+                sys.exit()
+            else:
+                for File in Files:
+                    os.remove(File)
+            
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
     for DicFN in DicFNs:
         Copy=os.path.join(SandboxOutputDir,DicFN+'.rest')
         shutil.copy(os.path.join(DicDir,DicFN),Copy)
-    MgdDicName=myModule.merge_filenames(DicFNs)
+    MgdDicName=myModule.merge_filenames(DicFNs,UpperBound=10)
     OutFPStem=os.path.join(SandboxOutputDir,MgdDicName).replace('.csv','')
     if Lang=='jp':
-        Chars=set([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョ')])
+        Chars=[Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3]
     for CharCntr,Char in enumerate(Chars):
         sys.stderr.write('\nWords starting with '+Char+' sought\n')
         MecabWds={}
@@ -201,7 +212,7 @@ def create_indexed_dic(DicDir,Lang='jp'):
                 for LiNe in FSr:
                     Line=LiNe.strip()
                     StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
-                    if Char==StartChar:
+                    if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
                         MecabWd=mecabline2mecabwd(Line,'dic')
                         MecabWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
                     elif CharCntr==0 and StartChar not in Chars:
@@ -371,7 +382,8 @@ def extract_identityattvals(ResFP,Type,IdentityAtts,SrcFts=None):
             if Type=='corpus':
                 if IdentityAtts not in Seen:
                     Seen.add(IdentityAttVals)
-                    IAttsInds[IdentityAttVals].append(Ind)
+                    Reading='*' if 'reading' not in WdFts.keys() else WdFts['reading']
+                    IAttsInds[(IdentityAttVals,Reading)].append(Ind)
             else:
                 IAttsInds[IdentityAttVals].append(Ind)
     return {IAtt:tuple(Inds) for (IAtt,Inds) in IAttsInds.items()}

@@ -1,4 +1,4 @@
-import imp,sys,os,re,glob,copy,time
+import imp,sys,os,re,glob,copy,time,shutil
 from collections import defaultdict
 #import mecab2juman as m2j
 from pythonlib_ys import jp_morph
@@ -8,14 +8,19 @@ imp.reload(mtools)
 #imp.reload(m2j)
 imp.reload(jp_morph)
 
+CharSetsWithRelatives={'カキクケコ':'ガ|ギ|グ|ゲ|ゴ','サシスセソ':'ザ|ジ|ズ|ゼ|ゾ','タチツテト':'ダヂヅデド','ハヒフヘホ':'パバ|ピビ|プブ|ペベ|ポボ'}
+CharsWithRelatives={}
+for CharSet,Relatives in CharSetsWithRelatives.items():
+    for Char,Relative in zip(list(CharSet),list(Relatives.split('|'))):
+        CharsWithRelatives[Char]=tuple(Relative)
+
 def convtable_check(ConvTable):
     for MecabCat,TgtCats in ConvTable.items():
         sys.stderr.write(repr(MecabCat)+': ')
         for TgtCat in TgtCats:
             sys.stderr.write(repr(TgtCat)+'\n')
 
-def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRedoObjDic=True,MakeTextDicToo=False,Strict=False,Debug=False):
-    
+def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, RedoIfExist=True,MakeTextDicToo=False,Strict=False,Debug=False):
     TagDir=os.path.join(os.getcwd(),'tagsets')
     (TgtCatFP,Mapping)= (os.path.join(TagDir,'juman_cats.txt'),mtools.MecabJumanMapping) if TgtScheme=='juman' else (os.path.join(TagDir,'csj_cats.txt'),mtools.MecabCSJMapping)
 
@@ -23,52 +28,67 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, NotRed
         DicOutDir=re.sub('/$','',OrgResDir)+'_trans_'+TgtScheme
         if not os.path.isdir(DicOutDir):
             os.makedirs(DicOutDir)
-    ODicOutDir=os.path.join(DicOutDir,'objdics')
-    if not os.path.isdir(ODicOutDir):
-        os.makedirs(ODicOutDir)
-    if not MakeTextDicToo:
-        TDicOutDir=None
-    else:
-        TDicOutDir=os.path.join(DicOutDir,'textdics')
-        if not os.path.isdir(TDicOutDir):
-            os.makedirs(TDicOutDir)
+
+    translate_dic(OrgResDir,TgtCatFP,Mapping,DicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo,RedoIfExist=RedoIfExist)
 
     if CorpusDir:
-        CorpusFPs=mtools.validate_corpora_dics_indir(CorpusDir)
+        translate_corpora(CorpusDir,DicOutDir,TgtScheme,Debug=Debug)
 
-    translate_dic(OrgResDir,TgtCatFP,Mapping,ODicOutDir,TDicOutDir=TDicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo)
-    
-    if CorpusDir:
-        CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans_'+TgtScheme
-        for CorpusFP in CorpusFPs:
-            OutFP=myModule.change_ext(os.path.join(CorpusOutDir,CorpusFP),TgtScheme)
-            translate_corpus(CorpusFP,DicOutDir)
 
-def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,TDicOutDir=None,MakeTextDicToo=False,Debug=False):
+def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=False,Debug=False,RedoIfExist=True):
+    def clean_old_files(OutDir,Backup=True):
+        OldOutFiles=glob.glob(OutDir+'/*.pickle')
+        if OldOutFiles:
+            if not RedoIfExist:
+                return False
+            if Backup:
+                BackupDir=os.path.join(OutDir,'bak')
+            for File in OldOutFiles:
+                if not Backup:
+                    os.remove(File)
+                else:
+                    shutil.copy2(File,BackupDir)
+        return True
+
+        TDicOutDir=os.path.join(OutDir,'textdics')
+        if os.path.isdir(TDicOutDir):
+            shutil.removetree(TDicOutDir)
+#    def prepare_new_dirs(OrgResDir,MakeTextDicToo):
+
+            
     if not OrgResDir:
         if not os.path.join(OrgResDir,'alphdics'):
             sys.exit('alphdic dir does not exist')
         else:
             mtools.create_indexing_dic(OrgResDir)
+            
+    TgtCats=mtools.construct_tree_from_file(TgtCatFP)
+    ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
 
+    if Debug:
+        convtable_check(ConvTable)
+    
+    RedoP=clean_old_files(OutDir)
+    if not RedoP:
+        return None
+
+    if MakeTextDicToo:
+        TDicOutDir=os.path.join(OutDir,'textdics')
+        if not os.path.isdir(TDicOutDir):
+            os.makedirs(TDicOutDir)
     ODictFPs=glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))
     SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in ODictFPs])
     
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
     SrcODictName=SrcODictNames.pop()
-    
-    TgtCats=mtools.construct_tree_from_file(TgtCatFP)
-    ConvTable=mtools.create_conversion_table(mtools.MecabIPACats,TgtCats,SrcTgtMap)
-    if Debug:
-        convtable_check(ConvTable)
-    
+            
     for Cntr,FP in enumerate(ODictFPs):
         Alph=FP.split('.')[-3]
         AlphObjDic=myModule.load_pickle(FP)
 
         Errors=defaultdict(list)
-        NewWds={};Dups=defaultdict(list);ECnt=0
+        NewWds=defaultdict(list);Dups=defaultdict(list);ECnt=0
         for WdCntr,(EssentialEls,Wd) in enumerate(AlphObjDic.items()):
             NewWd,ErrorCode=translate_word(Wd,ConvTable,TgtSpec,Debug=Debug)
             if ErrorCode:
@@ -77,19 +97,17 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,TDicOutDir=None,Ma
  #               LostCnt=sum(len(List) for ErrCat,List in Errors.items())
   #              assert(ECnt==LostCnt)
             else:
-                NewEssentialVals=tuple([ NewWd.__dict__[Att] for Att in NewWd.identityatts ])
-                if NewEssentialVals in NewWds.keys():
-                    Dups[NewEssentialVals].append(WdCntr)
-                else:
-                    NewWds[NewEssentialVals]=NewWd
+#                NewEssentialVals=tuple([ NewWd.__dict__[Att] for Att in NewWd.identityatts ])
+                NewWds[EssentialEls].append(NewWd)
 
         OrgWdCnt=WdCntr+1
         LostCnt=sum(len(List) for ErrCat,List in Errors.items())
         assert(OrgWdCnt==len(NewWds)+LostCnt+len(Dups))
         sys.stderr.write('\nDic for "'+Alph+'", '+str(OrgWdCnt)+' wds processed, ('+str(len(Dups))+' dups) '+str(LostCnt)+' wds lost\n')
         FNStem=SrcODictName+'_'+Alph
-        myModule.dump_pickle(NewWds,os.path.join(OutDir,FNStem+'.objdic'))
-        if TDicOutDir:
+        OutDicFP=os.path.join(OutDir,FNStem+'.objdic')
+        myModule.dump_pickle(NewWds,OutDicFP)
+        if MakeTextDicToo:
             output_textdic(NewWds,os.path.join(TDicOutDir,FNStem+'.textdic'))
         
 #        if DoCorpus and Cntr==0:
@@ -198,30 +216,59 @@ def translate_infpat(MInfP,Lemma,TgtSpec='csj'):
     NewDanGyo=NewGyo+NewDan
     return NewDanGyo,SpecialNote
 
-def translate_corpus(MecabCorpusFP,ObjDicDir):
-    CorpusEssAttsLines=mtools.extract_identityattvals(MecabCorpusFP,'corpus',['cat','lemma','infform'])
-    CorpusEssAtts=set(CorpusEssAttsLines.keys())
-    ObjDicFPs=glob.glob(ObjDicDir+'/*.pickle')
-    FndWds={}
-    for ObjDicFP in ObjDicFPs:
-        ObjDic=myModule.load_pickle(ObjDicFP)
-        for DicEssAtt in ObjDic.keys():
-            if DicEssAtt in CorpusEssAtts:
-                FndWds[CorpusEssAttsLines[DicEssAtt]]=ObjDic[DicEssAtt]
+def translate_corpora(CorpusDir,ObjDicDir,TgtScheme,OutFP=None,Debug=False):
+        DicCorpusFPs=mtools.validate_corpora_dics_indir(CorpusDir)
+        CorpusOutDir=re.sub('/$','', CorpusDir)+'_trans_'+TgtScheme
         
+        for CorpusFP in DicCorpusFPs['corpus']:
+            OutFP=myModule.change_ext(os.path.join(CorpusOutDir,CorpusFP),TgtScheme)
+            translate_corpus(CorpusFP,ObjDicDir,OutFP=CorpusFP+'.out',Debug=Debug)
+
+def translate_corpus(MecabCorpusFP,ObjDicDir,OutFP=None,Debug=False):
+    
+    # collect all essentialels from the corpus, with line numbers
+    CorpusEssAttsLines=mtools.extract_identityattvals(MecabCorpusFP,'corpus',['cat','orth','infform'])
+    LineCnt=myModule.get_linecount(MecabCorpusFP)
+    # objdic, with mecab keys but translated contents
+    AlphObjDicFPs=glob.glob(ObjDicDir+'/*.pickle')
+    if not AlphObjDicFPs:
+        sys.exit('Objdics not found in '+ObjDicDir)
+    # we're now identifying lines with existent keys in objedic
+    FndWds={}
+    for AlphObjDicFP in AlphObjDicFPs:
+        AlphObjDic=myModule.load_pickle(AlphObjDicFP)
+        Alph=myModule.get_stem_ext(myModule.get_stem_ext(AlphObjDicFP)[0])[0][-1]
+        for (CorpusEssAtt,Reading),Lines in CorpusEssAttsLines.items():
+            if CorpusEssAtt in AlphObjDic.keys():
+                for Line in Lines:
+                    FndWds[Line]=AlphObjDic[CorpusEssAtt][0]
+            else:
+                if Debug:
+                    #CharsWithRelatives=jp_morph.CharsWithRelatives
+                    if Reading.startswith(Alph) or (Alph in CharsWithRelatives.keys() and any(Reading.startswith(Relative) for Relative in CharsWithRelatives[Alph])):
+                        sys.stderr.write(repr(CorpusEssAtt)+' not found')
+                        sys.stderr.write('\n')
+                        
+    
+    sys.stderr.write('you have '+str(LineCnt-len(FndWds.keys()))+' missing entries out of '+str(LineCnt)+'\n')
+
+    Out=sys.stdout if OutFP is None else open(OutFP,'wt')
     with open(MecabCorpusFP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
             if LiNe=='EOS\n':
                 TransWdStr=LiNe.strip()
             else:
-                WdIfFnd=next((Wd for (Inds,Wd) in FndWds.items() if Cntr in Inds), None)
-                if WdIfFnd is None:
-                    TransWdStr=fallback_trans('FALLBACK\t'+LiNe.strip())
+                if Cntr in FndWds.keys():
+                    TransWdStr=FndWds[Cntr].get_mecabline()
+#                WdIfFnd=next((Wd for (Inds,Wd) in FndWds.items() if Cntr in Inds), None)
+ #               if WdIfFnd is None:
                 else:
-                    TransWdStr=WdIfFnd.get_mecabline()
+                    TransWdStr=fallback_trans('FALLBACK\t'+LiNe.strip())
 
-            sys.stdout.write(TransWdStr+'\n')
-            
+            sys.stdout.write(TransWdStr+'\n')        
+            Out.write(TransWdStr+'\n')
+    Out.close()
+    
 def fallback_trans(Line):
     return Line
     
@@ -234,7 +281,7 @@ def main():
     Psr.add_argument('resdir')
     Psr.add_argument('target_scheme')
     Psr.add_argument('--out-dir',default=None)
-    Psr.add_argument('--not-redo-objdic',default=True)
+    Psr.add_argument('--not-redo-if-exist',action='store_true')
     Psr.add_argument('--idiodic',default=None)
     Psr.add_argument('--corpus-dir',default=None)
     Psr.add_argument('--textdic-too',action='store_true')
@@ -247,7 +294,7 @@ def main():
     if not os.path.isdir(Args.resdir) or (Args.out_dir and not os.path.isdir(Args.out_dir)) or (Args.corpus_dir and not os.path.isdir(Args.corpus_dir)):
         sys.exit('non dir specified for a dir')
     
-    main0(Args.resdir, Args.target_scheme, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, NotRedoObjDic=Args.not_redo_objdic,MakeTextDicToo=Args.textdic_too,Debug=Args.debug)
+    main0(Args.resdir, Args.target_scheme, Args.out_dir, Args.idiodic, CorpusDir=Args.corpus_dir, RedoIfExist=not Args.not_redo_if_exist,MakeTextDicToo=Args.textdic_too,Debug=Args.debug)
 
 if __name__=='__main__':
     main()

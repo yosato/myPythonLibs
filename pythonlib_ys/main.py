@@ -22,7 +22,7 @@ def merge_tuples_withindex(Tuples):
     return MgdTuples
         
 
-def merge_filenames(FNs):
+def merge_filenames(FNs,UpperBound=5):
     assert all('/' not in FN for FN in FNs)
     Stems,Exts=merge_tuples_withindex([get_stem_ext(FN) for FN in FNs])
     assert all(Ext==Exts[0] for Ext in Exts[1:])
@@ -30,7 +30,7 @@ def merge_filenames(FNs):
         
     StemStrs=[]
     for Cntr,Stem in enumerate(Stems):
-        if Cntr>4:
+        if Cntr>UpperBound:
             StemStrs.append('others')
             break
         StemStrs.append(Stem)
