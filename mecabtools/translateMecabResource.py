@@ -8,11 +8,6 @@ imp.reload(mtools)
 #imp.reload(m2j)
 imp.reload(jp_morph)
 
-CharSetsWithRelatives={'カキクケコ':'ガ|ギ|グ|ゲ|ゴ','サシスセソ':'ザ|ジ|ズ|ゼ|ゾ','タチツテト':'ダヂヅデド','ハヒフヘホ':'パバ|ピビ|プブ|ペベ|ポボ'}
-CharsWithRelatives={}
-for CharSet,Relatives in CharSetsWithRelatives.items():
-    for Char,Relative in zip(list(CharSet),list(Relatives.split('|'))):
-        CharsWithRelatives[Char]=tuple(Relative)
 
 def convtable_check(ConvTable):
     for MecabCat,TgtCats in ConvTable.items():
@@ -44,10 +39,9 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=Fal
             if Backup:
                 BackupDir=os.path.join(OutDir,'bak')
             for File in OldOutFiles:
-                if not Backup:
-                    os.remove(File)
-                else:
+                if Backup:
                     shutil.copy2(File,BackupDir)
+                os.remove(File)
         return True
 
         TDicOutDir=os.path.join(OutDir,'textdics')
@@ -236,6 +230,7 @@ def translate_corpus(MecabCorpusFP,ObjDicDir,OutFP=None,Debug=False):
     # we're now identifying lines with existent keys in objedic
     FndWds={}
     for AlphObjDicFP in AlphObjDicFPs:
+        sys.stderr.write(AlphObjDicFP+'\n'),
         AlphObjDic=myModule.load_pickle(AlphObjDicFP)
         Alph=myModule.get_stem_ext(myModule.get_stem_ext(AlphObjDicFP)[0])[0][-1]
         for (CorpusEssAtt,Reading),Lines in CorpusEssAttsLines.items():
@@ -244,7 +239,7 @@ def translate_corpus(MecabCorpusFP,ObjDicDir,OutFP=None,Debug=False):
                     FndWds[Line]=AlphObjDic[CorpusEssAtt][0]
             else:
                 if Debug:
-                    #CharsWithRelatives=jp_morph.CharsWithRelatives
+                    CharsWithRelatives=jp_morph.CharsWithRelatives
                     if Reading.startswith(Alph) or (Alph in CharsWithRelatives.keys() and any(Reading.startswith(Relative) for Relative in CharsWithRelatives[Alph])):
                         sys.stderr.write(repr(CorpusEssAtt)+' not found')
                         sys.stderr.write('\n')

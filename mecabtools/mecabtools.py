@@ -170,9 +170,12 @@ def validate_corpora_dics_indir(Dir,Strict=False):
                 CDFPs[CorD]=list(set(CDFPs[CorD])-set(FPs))
         return CDFPs
 
+#def sort_dic(DicFP,ColNum):
+#    subprocess.
+ #   StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
 
 def create_indexed_dic(DicDir,Lang='jp'):
-    CharWithRelatives=jp_morph.CharWithRelatives
+    CharsWithRelatives=jp_morph.CharsWithRelatives
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
     assert DicFPs
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
@@ -182,57 +185,55 @@ def create_indexed_dic(DicDir,Lang='jp'):
     else:
         Files=glob.glob(SandboxOutputDir+'/*')
         if Files:
-            Answer=myModule.prompt_loop_bool('files exist in the dir, which are to be deleted. Is that okay?')
-            if Answer=='no':
-                sys.exit()
-            else:
-                for File in Files:
-                    os.remove(File)
-            
+            for File in Files:
+                os.remove(File)
+    # these are the original files, to be copied with '.tmp' ext        
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
+    RestFPs=[]
     for DicFN in DicFNs:
-        Copy=os.path.join(SandboxOutputDir,DicFN+'.rest')
-        shutil.copy(os.path.join(DicDir,DicFN),Copy)
+        RestFP=os.path.join(SandboxOutputDir,DicFN+'.rest')
+        shutil.copy(os.path.join(DicDir,DicFN),RestFP)
+        RestFPs.append(RestFP)
+    # name of the new alph file stem    
     MgdDicName=myModule.merge_filenames(DicFNs,UpperBound=10)
     OutFPStem=os.path.join(SandboxOutputDir,MgdDicName).replace('.csv','')
     if Lang=='jp':
+        # excluding rare stuff (separate file) and dakuten stuff (included in the nonvoiced ctrprt)
         Chars=[Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3]
     for CharCntr,Char in enumerate(Chars):
         sys.stderr.write('\nWords starting with '+Char+' sought\n')
-        MecabWds={}
-        if CharCntr==0:
-            MecabOutsiders={}
-        for DicFN in DicFNs:
-            SBFPStem=os.path.join(SandboxOutputDir,DicFN)
-            TmpFP=SBFPStem+'.tmp'
+        MecabWdsPerChar={}
+        for RestFP in RestFPs:
+            TmpFP=RestFP+'.tmp'
             TmpFSw=open(TmpFP,'wt')
-            RestFP=SBFPStem+'.rest'
-            sys.stderr.write(DicFN+'\n')
             with open(RestFP) as FSr:
                 for LiNe in FSr:
                     Line=LiNe.strip()
                     StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
+#                    print(Line)
+ #                   print(StartChar)
                     if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
                         MecabWd=mecabline2mecabwd(Line,'dic')
-                        MecabWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
-                    elif CharCntr==0 and StartChar not in Chars:
-                        MecabOutsider=mecabline2mecabwd(Line,'dic')
-                        MecabOutsiders[tuple(MecabOutsider.identityattsvals.values())]=MecabOutsider
+                        MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
                     else:
                         TmpFSw.write(LiNe)
             TmpFSw.close()
             os.rename(TmpFP,RestFP)
-        if MecabWds:
-            sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWds))+' entries\n')
-            myModule.dump_pickle(MecabWds,OutFPStem+'.'+Char+'.objdic')
+        if MecabWdsPerChar:
+            sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
+            myModule.dump_pickle(MecabWdsPerChar,OutFPStem+'.'+Char+'.objdic')
         else:
             sys.stderr.write('nothing found for '+Char+'\n')
-        if CharCntr==0 and MecabOutsiders:
-            sys.stderr.write('Alphabet dic for outsiders done, '+str(len(MecabOutsiders))+' entries\n')
-            myModule.dump_pickle(MecabOutsiders,OutFPStem+'_outsiders')
-    for RestFP in glob.glob(os.path.join(SandboxOutputDir,'*.rest')):
-        os.remove(RestFP)
 
+    RestWds={}
+    for RestFile in RestFPs:
+        with open(RestFile) as FSr:
+            for LiNe in FSr:
+                MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
+                RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
+        sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
+        myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
+        os.remove(RestFile)
 
 def mecabline_p(Line):
     return ',' in Line or Line=='EOS'
