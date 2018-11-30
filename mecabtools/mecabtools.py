@@ -9,6 +9,8 @@ imp.reload(myModule)
 imp.reload(jp_morph)
 imp.reload(correspondences)
 
+CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ぺ','べ',),'ホ':('ポ','ボ',)}
+
 try:
     from ipdb import set_trace
 except:
@@ -175,7 +177,7 @@ def sort_dic(DicFP,ColNum,OutFP=None,InLineP=False):
     if not os.path.isfile(DicFP) or not os.path.isdir(os.path.dirname(OutFP)):
         sys.exit('file does not exist')
     TmpOutFP=DicFP+'.tmp'
-    ShellCmd=' '.join(['cat',DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
+    ShellCmd=' '.join(["grep -v ',記号,' ",DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
     Proc=subprocess.Popen(ShellCmd,shell=True)
     Proc.communicate()
     if InLineP:
@@ -230,24 +232,23 @@ def create_indexed_dic(DicDir,Lang='jp'):
 
         if MecabWdsPerChar:
             sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
-            myModule.dump_pickle(MecabWdsPerChar,OutFPStem+'.'+Char+'.objdic')
+            myModule.dump_pickle(MecabWdsPerChar,MgdFPStem+'.'+Char+'.objdic')
         else:
             sys.stderr.write('nothing found for '+Char+'\n')
 
     RestWds={}
-    for RestFile in RestFPs:
-        with open(RestFile) as FSr:
-            for LiNe in FSr:
-                MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
-                RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
-        os.remove(RestFile)
+    with open(RestFile) as FSr:
+        for LiNe in FSr:
+            MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
+            RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
+    os.remove(RestFile)
     sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
     myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
     
 
 def get_alphwords_fromdic(Char,RestFP):
     MecabWdsPerChar={}
-    CharsWithRelatives=jp_morph.CharsWithRelatives
+#    CharsWithRelatives=jp_morph.CharsWithRelatives
     with open(RestFP) as FSr:
                 Fnd=False
                 for LiNe in FSr:
@@ -261,7 +262,7 @@ def get_alphwords_fromdic(Char,RestFP):
                         MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
                     else:
                         if Fnd:
-                            return MecabWdsPerCharPer
+                            return MecabWdsPerChar
 
     return MecabWdsPerChar
 
