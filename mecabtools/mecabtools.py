@@ -170,12 +170,32 @@ def validate_corpora_dics_indir(Dir,Strict=False):
                 CDFPs[CorD]=list(set(CDFPs[CorD])-set(FPs))
         return CDFPs
 
-#def sort_dic(DicFP,ColNum):
-#    subprocess.
+def sort_dic(DicFP,ColNum,OutFP=None,InLineP=False):
+    NumStr=str(ColNum)+','+str(ColNum)
+    if not os.path.isfile(DicFP) or not os.path.isdir(os.path.dirname(OutFP)):
+        sys.exit('file does not exist')
+    TmpOutFP=DicFP+'.tmp'
+    ShellCmd=' '.join(['cat',DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
+    Proc=subprocess.Popen(ShellCmd,shell=True)
+    Proc.communicate()
+    if InLineP:
+        OutFP=DicFP
+    elif OutFP is None:
+        OutFP=DicFP+'.out'
+
+    
+    shutil.copy(TmpOutFP,OutFP)
+    os.remove(TmpOutFP)
  #   StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
 
+def deduplicate_list(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
+
+ 
 def create_indexed_dic(DicDir,Lang='jp'):
-    CharsWithRelatives=jp_morph.CharsWithRelatives
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
     assert DicFPs
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
@@ -189,36 +209,25 @@ def create_indexed_dic(DicDir,Lang='jp'):
                 os.remove(File)
     # these are the original files, to be copied with '.tmp' ext        
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
-    RestFPs=[]
-    for DicFN in DicFNs:
-        RestFP=os.path.join(SandboxOutputDir,DicFN+'.rest')
-        shutil.copy(os.path.join(DicDir,DicFN),RestFP)
-        RestFPs.append(RestFP)
-    # name of the new alph file stem    
-    MgdDicName=myModule.merge_filenames(DicFNs,UpperBound=10)
-    OutFPStem=os.path.join(SandboxOutputDir,MgdDicName).replace('.csv','')
+    #RestFPs=[];DicFNs=[os.path.basename(RestFP) for RestFP in RestFPs]
+    MgdFNStem=myModule.merge_filenames(DicFNs,UpperBound=10)
+    MgdFPStem=os.path.join(SandboxOutputDir,MgdFNStem)
+    MgdDicTmpFP=MgdFPStem+'.rest'
+    FSw=open(MgdDicTmpFP,'wt')
+    for DicFP in DicFPs:
+        with open(DicFP) as FSr:
+            FSw.write(FSr.read())
+    FSw.close()
+        
+    sort_dic(MgdDicTmpFP,13,MgdDicTmpFP,InLineP=True)    # name of the new alph file stem    
     if Lang=='jp':
         # excluding rare stuff (separate file) and dakuten stuff (included in the nonvoiced ctrprt)
-        Chars=[Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3]
+        Chars=deduplicate_list([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3])
     for CharCntr,Char in enumerate(Chars):
         sys.stderr.write('\nWords starting with '+Char+' sought\n')
-        MecabWdsPerChar={}
-        for RestFP in RestFPs:
-            TmpFP=RestFP+'.tmp'
-            TmpFSw=open(TmpFP,'wt')
-            with open(RestFP) as FSr:
-                for LiNe in FSr:
-                    Line=LiNe.strip()
-                    StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
-#                    print(Line)
- #                   print(StartChar)
-                    if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
-                        MecabWd=mecabline2mecabwd(Line,'dic')
-                        MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
-                    else:
-                        TmpFSw.write(LiNe)
-            TmpFSw.close()
-            os.rename(TmpFP,RestFP)
+
+        MecabWdsPerChar=get_alphwords_fromdic(Char,MgdDicTmpFP)
+
         if MecabWdsPerChar:
             sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
             myModule.dump_pickle(MecabWdsPerChar,OutFPStem+'.'+Char+'.objdic')
@@ -231,9 +240,30 @@ def create_indexed_dic(DicDir,Lang='jp'):
             for LiNe in FSr:
                 MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
                 RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
-        sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
-        myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
         os.remove(RestFile)
+    sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
+    myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
+    
+
+def get_alphwords_fromdic(Char,RestFP):
+    MecabWdsPerChar={}
+    CharsWithRelatives=jp_morph.CharsWithRelatives
+    with open(RestFP) as FSr:
+                Fnd=False
+                for LiNe in FSr:
+                    Line=LiNe.strip()
+                    StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
+
+                    if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
+                        if not Fnd:
+                            Fnd=True
+                        MecabWd=mecabline2mecabwd(Line,'dic')
+                        MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
+                    else:
+                        if Fnd:
+                            return MecabWdsPerCharPer
+
+    return MecabWdsPerChar
 
 def mecabline_p(Line):
     return ',' in Line or Line=='EOS'

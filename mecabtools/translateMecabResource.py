@@ -77,9 +77,9 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=Fal
         sys.exit('there are too many or no objdic stems')
     SrcODictName=SrcODictNames.pop()
             
-    for Cntr,FP in enumerate(ODictFPs):
-        Alph=FP.split('.')[-3]
-        AlphObjDic=myModule.load_pickle(FP)
+    for Cntr,DictFP in enumerate(ODictFPs):
+        Alph=DictFP.split('.')[-3]
+        AlphObjDic=myModule.load_pickle(DictFP)
 
         Errors=defaultdict(list)
         NewWds=defaultdict(list);Dups=defaultdict(list);ECnt=0
@@ -250,22 +250,30 @@ def translate_corpus(MecabCorpusFP,ObjDicDir,OutFP=None,Debug=False):
     Out=sys.stdout if OutFP is None else open(OutFP,'wt')
     with open(MecabCorpusFP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
-            if LiNe=='EOS\n':
-                TransWdStr=LiNe.strip()
+            Line=LiNe.strip()
+            if Line=='EOS':
+                TransWdStr=Line
             else:
-                if Cntr in FndWds.keys():
+                Orth,Rest=Line.split('\t')
+                Fts=Rest.split(',')
+                if Fts[0]=='記号':
+                    TransWdStr=fallback_trans(Orth,Fts)
+                elif Cntr in FndWds.keys():
                     TransWdStr=FndWds[Cntr].get_mecabline()
 #                WdIfFnd=next((Wd for (Inds,Wd) in FndWds.items() if Cntr in Inds), None)
  #               if WdIfFnd is None:
                 else:
-                    TransWdStr=fallback_trans('FALLBACK\t'+LiNe.strip())
-
-            sys.stdout.write(TransWdStr+'\n')        
+                    TransWdStr='FALLBACK\t'+fallback_trans(Orth,Fts)
+                    #except:
+                     #   fallback_trans(LiNe.strip())
+            #sys.stdout.write(TransWdStr+'\n')        
             Out.write(TransWdStr+'\n')
     Out.close()
     
-def fallback_trans(Line):
-    return Line
+def fallback_trans(Orth,Fts):
+    Reading=Fts[8] if len(Fts)==9 else '*'
+    NewLine=Orth+'\t'+','.join([Fts[0],Fts[1],'*',Fts[5],Fts[4],Fts[6],Reading])
+    return NewLine
     
 
 
