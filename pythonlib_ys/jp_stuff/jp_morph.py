@@ -8,6 +8,10 @@ sys.path.append(HomeDir+'/myProgs/python')
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 
+def identify_phoneassimgodan_fromchar(Char):
+    OnbinsGyos={'イ音便':{'か','が'},'撥音便':{'ま','な'},'促音便':{'た','ら','わ'}}
+    return next((Onbin for Onbin in OnbinsGyos.keys() if identify_gyo(Char) in OnbinsGyos[Onbin]),None)
+
 def pick_highest_charrate(Cands,CharTypes):
     return max([(Cand,chartype_rate(Cand.orth,CharTypes)) for Cand in Cands], key=lambda x:x[1])
         
