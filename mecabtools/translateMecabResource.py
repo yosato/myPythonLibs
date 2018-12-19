@@ -23,31 +23,31 @@ def main0(OrgResDir,TgtScheme,DicOutDir=None,IdioDic=None,CorpusDir=None, RedoIf
         DicOutDir=re.sub('/$','',OrgResDir)+'_trans_'+TgtScheme
         if not os.path.isdir(DicOutDir):
             os.makedirs(DicOutDir)
-
+        
     translate_dic(OrgResDir,TgtCatFP,Mapping,DicOutDir,TgtSpec='csj',Debug=Debug,MakeTextDicToo=MakeTextDicToo,RedoIfExist=RedoIfExist)
 
     if CorpusDir:
         translate_corpora(CorpusDir,DicOutDir,TgtScheme,Debug=Debug)
 
+def clean_and_backup(Dir,Backup=True,Glob='*'):
+            Files=[F for F in glob.glob(Dir+'/'+Glob) if not os.path.isdir(F)]
+           # if not Files:
+            #    stderr
+            if Files:
+                if Backup:
+                    BackupDir=os.path.join(Dir,'bak')
+                    if not os.path.isdir(BackupDir):
+                        os.makedirs(BackupDir)
+                for File in Files:
+                    if Backup:
+                        shutil.copy(File,BackupDir)
+                    os.remove(File)
+       
 
 def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=False,Debug=False,RedoIfExist=True):
     def clean_old_files(OutDir,Backup=True):
-        OldOutFiles=glob.glob(OutDir+'/*.pickle')
-        if OldOutFiles:
-            if not RedoIfExist:
-                return False
-            if Backup:
-                BackupDir=os.path.join(OutDir,'bak')
-            for File in OldOutFiles:
-                if Backup:
-                    shutil.copy2(File,BackupDir)
-                os.remove(File)
-        return True
-
-        TDicOutDir=os.path.join(OutDir,'textdics')
-        if os.path.isdir(TDicOutDir):
-            shutil.removetree(TDicOutDir)
-#    def prepare_new_dirs(OrgResDir,MakeTextDicToo):
+        clean_and_backup(OutDir,Backup=Backup)
+        clean_and_backup(OutDir+'/textdic',Backup=Backup)
 
             
     if not OrgResDir:
@@ -61,21 +61,23 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=Fal
 
     if Debug:
         convtable_check(ConvTable)
-    
-    RedoP=clean_old_files(OutDir)
-    if not RedoP:
+
+    if not RedoIfExist and glob.glob(OutDir+'/*.pickle'):
         return None
+    else:
+        clean_old_files(OutDir)
+        
 
     if MakeTextDicToo:
         TDicOutDir=os.path.join(OutDir,'textdics')
         if not os.path.isdir(TDicOutDir):
             os.makedirs(TDicOutDir)
     ODictFPs=glob.glob(os.path.join(OrgResDir,'*.objdic.pickle'))
-    SrcODictNames=set(['.'.join(os.path.basename(FP).split('.')[:-3]) for FP in ODictFPs])
+    SrcODictNames=set([os.path.basename(FP).split('.')[0] for FP in ODictFPs])
     
     if len(SrcODictNames)!=1:
         sys.exit('there are too many or no objdic stems')
-    SrcODictName=SrcODictNames.pop()
+#    SrcODictName=SrcODictNames.pop()
             
     for Cntr,DictFP in enumerate(ODictFPs):
         Alph=DictFP.split('.')[-3]
@@ -98,7 +100,7 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=Fal
         LostCnt=sum(len(List) for ErrCat,List in Errors.items())
         assert(OrgWdCnt==len(NewWds)+LostCnt+len(Dups))
         sys.stderr.write('\nDic for "'+Alph+'", '+str(OrgWdCnt)+' wds processed, ('+str(len(Dups))+' dups) '+str(LostCnt)+' wds lost\n')
-        FNStem=SrcODictName+'_'+Alph
+        FNStem=re.sub(r'\.objdic\.pickle$','',os.path.basename(DictFP))
         OutDicFP=os.path.join(OutDir,FNStem+'.objdic')
         myModule.dump_pickle(NewWds,OutDicFP)
         if MakeTextDicToo:
@@ -109,13 +111,12 @@ def translate_dic(OrgResDir,TgtCatFP,SrcTgtMap,OutDir,TgtSpec,MakeTextDicToo=Fal
 
 def output_textdic(Dict,FP):
     with open(FP,'wt') as FSw:
-        for Wd in Dict.values():
-            FSw.write(Wd.get_mecabline()+'\n')
+        for Wds in Dict.values():
+            for Wd in Wds:
+                FSw.write(Wd.get_mecabline()+'\n')
 
-
-
-    
-        
+SpecialCases={('名詞','の','*'):mtools.MecabWdParse({'orth':'の','cat':'助詞','subcat':'準体助詞','infform':'*','subcat2':'*','reading':'ノ','pronunciation':'ノ'}),('名詞','ん','*'):mtools.MecabWdParse({'orth':'ん','cat':'助詞','subcat':'準体助詞','subcat2':'*','infform':'*','reading':'ン','pronunciation':'ン'})}
+                
     
 def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
     InhAttsTable={'csj':[('orth','cat','subcat','phoneassim','infform','infpat','lemma','reading'),(3,)],'juman':[('orth','cat','subcat','phonassim','infform','infpat','lemma','reading'),(3,)]}
@@ -129,6 +130,11 @@ def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
         return None,'convtable'
     TgtCats=CatConvTable[Feats][0]
     OrgCats=('cat','subcat','subcat2','sem')
+    EssAtts=tuple(Wd.identityattsvals.values())
+    
+    if EssAtts in SpecialCases.keys():
+        return SpecialCases[EssAtts],None
+
     if Wd.cat in InfCats:
         (NewInfPat,NewInfForm,PhoneAssim)=process_yogen(Wd,TgtSpec)
         if any(Var is None for Var in (NewInfPat,NewInfForm)):
@@ -166,12 +172,16 @@ def translate_word(Wd,CatConvTable,TgtSpec,MaxLevel=4,Debug=False):
 def process_yogen(Wd,TgtSpec):
     NewInfF=translate_infform(Wd.infform,TgtSpec)
     NewPat,SNote=translate_infpat(Wd.infpat,Wd.lemma,TgtSpec)
-    PhoneAssim=identify_phoneassim(Wd) if (NewInfF=='連用形' and NewPat=='五段') else None 
+    PhoneAssim=identify_phoneassim(Wd)
     return NewPat,NewInfF,PhoneAssim
 
 def identify_phoneassim(Wd):
-    OnbinsGyos={'イ音便':{'k','g'},'撥音便':{'m','n'},'促音便':{'t','r','w'}}
-    return next((Onbin for Onbin in OnbinsGyos.keys() if jp_morph.identify_gyo(Wd.lemma) in OnbingGyos[Onbin]),None)
+    OnbinsGyos={'イ音便':{'か','が'},'撥音便':{'ま','な'},'促音便':{'た','ら','あ'}}
+    if Wd.infpat=='五段' and Wd.infform=='連用タ接続':
+        for Onbin in OnbinsGyos.keys():
+            if jp_morph.identify_gyo(Wd.lemma[-1]) in OnbinsGyos[Onbin]:
+                return Onbin
+    return None
 
 def translate_infform(MInfF,TgtSpec='csj'):
     FstTwo=MInfF[:2]

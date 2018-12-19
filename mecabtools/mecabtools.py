@@ -9,7 +9,15 @@ imp.reload(myModule)
 imp.reload(jp_morph)
 imp.reload(correspondences)
 
-CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ぺ','べ',),'ホ':('ポ','ボ',)}
+CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ペ','ベ',),'ホ':('ポ','ボ',),'ア':('ァ',),'イ':('ィ',),'ウ':('ゥ','ヴ',),'エ':('ェ',),'オ':('ォ',),'ヤ':('ャ',),'ユ':('ュ',),'ヨ':('ョ',),'ツ':('ヅ','ッ',)}
+RelativesToChars={Rels:Char for (Char,Rels) in CharsWithRelatives.items()}
+RelativeToChar={}
+for Rels,Char in RelativesToChars.items():
+    for Rel in Rels:
+        RelativeToChar[Rel]=Char
+    
+CharsWithoutRelatives=list('ナニヌネノマミムメモラリルレロワ')
+EntryChars=list(CharsWithRelatives.keys())+CharsWithoutRelatives
 
 try:
     from ipdb import set_trace
@@ -177,17 +185,20 @@ def sort_dic(DicFP,ColNum,OutFP=None,InLineP=False):
     if not os.path.isfile(DicFP) or not os.path.isdir(os.path.dirname(OutFP)):
         sys.exit('file does not exist')
     TmpOutFP=DicFP+'.tmp'
-    ShellCmd=' '.join(["grep -v ',記号,' ",DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
-    Proc=subprocess.Popen(ShellCmd,shell=True)
-    Proc.communicate()
+#    TmpFPForNoReading=DicFP+'.noread'
+ #   ShellCmd=' '.join(["sed -i '/\* *$/p'",DicFP,'>',TmpFPForNoReading])
+  #  subprocess.Popen(ShellCmd,shell=True).communicate()
+    ShellCmd=' '.join(['sed',"'/\* *$/d'",DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
+    subprocess.Popen(ShellCmd,shell=True).communicate()
     if InLineP:
         OutFP=DicFP
     elif OutFP is None:
         OutFP=DicFP+'.out'
 
-    
-    shutil.copy(TmpOutFP,OutFP)
+    if InLineP:
+        shutil.copy(TmpOutFP,OutFP)
     os.remove(TmpOutFP)
+
  #   StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
 
 def deduplicate_list(seq):
@@ -195,75 +206,117 @@ def deduplicate_list(seq):
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
 
-
+def divide_dic_into_alphdics(DicFP,FPsPerChar,RelToChar):
+    OrgTotal=myModule.get_linecount(DicFP)
+    CharsFSws={EntryChar:open(FP,'wt') for (EntryChar,FP) in FPsPerChar.items() }
+    
+    with open(DicFP) as FSr:
+        for LiNe in FSr:
+            StartChar=pick_feats_fromline(LiNe.strip(),['reading'],DicOrCorpus='dic')[0][1][0]
+            if StartChar in EntryChars:
+                myFSw=CharsFSws[StartChar]
+            elif StartChar in RelToChar.keys():
+                myFSw=CharsFSws[RelToChar[StartChar]]
+            else:
+                myFSw=CharsFSws['outsiders']
+            myFSw.write(LiNe)
+    for FSw in CharsFSws.values():
+        FSw.close()
+    ResTotal=0
+    for FP in FPsPerChar.values():
+        ResTotal+=myModule.get_linecount(FP)
+    
+    assert(OrgTotal==ResTotal)    
  
-def create_indexed_dic(DicDir,Lang='jp'):
+def create_alph_objdics(DicDir,Lang='jp',RedoSrc=True):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
     assert DicFPs
     assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
     SandboxOutputDir=os.path.join(DicDir,'objdics')
+    SandboxSrcDir=os.path.join(DicDir,'srcdics')
     if not os.path.isdir(SandboxOutputDir):
         os.makedirs(SandboxOutputDir)
+    if not os.path.isdir(SandboxSrcDir):
+        os.makedirs(SandboxSrcDir)
     else:
-        Files=glob.glob(SandboxOutputDir+'/*')
+        Files=glob.glob(SandboxOutputDir+'/*.objdic')
         if Files:
             for File in Files:
                 os.remove(File)
     # these are the original files, to be copied with '.tmp' ext        
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
     #RestFPs=[];DicFNs=[os.path.basename(RestFP) for RestFP in RestFPs]
-    MgdFNStem=myModule.merge_filenames(DicFNs,UpperBound=10)
-    MgdFPStem=os.path.join(SandboxOutputDir,MgdFNStem)
-    MgdDicTmpFP=MgdFPStem+'.rest'
+    MgdFNStem=myModule.get_stem_ext(myModule.merge_filenames(DicFNs,UpperBound=10))[0]
+    MgdFPSrcStem=os.path.join(SandboxSrcDir,MgdFNStem)
+    MgdDicTmpFP=MgdFPSrcStem+'.rest'
+
+    # merging all the dics
     FSw=open(MgdDicTmpFP,'wt')
     for DicFP in DicFPs:
         with open(DicFP) as FSr:
             FSw.write(FSr.read())
     FSw.close()
+    shutil.copy(MgdDicTmpFP,MgdDicTmpFP+'.org')
+
+    FPsPerChar={EntryChar:MgdFPSrcStem+'.'+EntryChar+'.csv' for EntryChar in EntryChars }
+    FPsPerChar['outsiders']=MgdFPSrcStem+'.outsiders.csv'
+
+    if RedoSrc:
+        divide_dic_into_alphdics(MgdDicTmpFP,FPsPerChar,RelativeToChar)
         
-    sort_dic(MgdDicTmpFP,13,MgdDicTmpFP,InLineP=True)    # name of the new alph file stem    
-    if Lang=='jp':
+
+    #if Lang=='jp':
         # excluding rare stuff (separate file) and dakuten stuff (included in the nonvoiced ctrprt)
-        Chars=deduplicate_list([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3])
-    for CharCntr,Char in enumerate(Chars):
-        sys.stderr.write('\nWords starting with '+Char+' sought\n')
 
-        MecabWdsPerChar=get_alphwords_fromdic(Char,MgdDicTmpFP)
+    for FPPerChar in FPsPerChar.values():
+        MecabWdsPerChar={}
+        with open(FPPerChar) as FSr:
+            for LiNe in FSr:
+                MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
+                MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
 
-        if MecabWdsPerChar:
-            sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
-            myModule.dump_pickle(MecabWdsPerChar,MgdFPStem+'.'+Char+'.objdic')
-        else:
-            sys.stderr.write('nothing found for '+Char+'\n')
+            if MecabWdsPerChar:
+                FPEls=FPPerChar.split('.')
+                SrcFPStem='.'.join(FPEls[:-1])
+                NewFPStem=change_dir_infp(SrcFPStem,5,'objdics')
+                Char=FPEls[-2]
+                sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
+                myModule.dump_pickle(MecabWdsPerChar,NewFPStem+'.objdic')
+            else:
+                sys.stderr.write('nothing found for '+Char+'\n')
 
-    RestWds={}
-    with open(RestFile) as FSr:
-        for LiNe in FSr:
-            MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
-            RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
-    os.remove(RestFile)
-    sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
-    myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
-    
-
-def get_alphwords_fromdic(Char,RestFP):
+def change_dir_infp(FP,Num,Repl):
+    New=FP.strip().split('/')
+    New[Num]=Repl
+    return '/'.join(New)
+                
+def get_alphwords_fromdic(Chars,RestFP):
     MecabWdsPerChar={}
+    TmpFP=RestFP+'.tmp'
+    FSw=open(TmpFP,'wt')
 #    CharsWithRelatives=jp_morph.CharsWithRelatives
     with open(RestFP) as FSr:
                 Fnd=False
                 for LiNe in FSr:
                     Line=LiNe.strip()
-                    StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
+                    StartChar=dict(pick_feats_fromline(Line,['pronunciation'],DicOrCorpus='dic'))['pronunciation'][0][0]
 
-                    if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
+                    if StartChar in Chars:
                         if not Fnd:
                             Fnd=True
                         MecabWd=mecabline2mecabwd(Line,'dic')
                         MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
                     else:
                         if Fnd:
+                            FSw.write(FSr.read())
+                            FSw.close()
+                            shutil.copy(TmpFP,RestFP)
+                            os.remove(TmpFP)
                             return MecabWdsPerChar
-
+                        FSw.write(LiNe)
+    FSw.close()
+    shutil.copy(TmpFP,RestFP)
+    os.remove(TmpFP)
     return MecabWdsPerChar
 
 def mecabline_p(Line):
@@ -315,11 +368,61 @@ def get_line(FP,LiNum):
                 return LiNe.strip()
         return None
 
-def decompose_corpusline(CorpusLine):
-    assert '\t' in CorpusLine and ',' in CorpusLine
-    Orth,Rest=CorpusLine.strip().split('\t')
-    Fts=Rest.strip().split(',')
-    return [Orth,Fts]
+def dic_or_corpus(FP):
+    if valid_mecabfile_p(FP,'corpus'):
+        return 'corpus'
+    elif valid_mecabfile_p(FP,'dic'):
+        return 'dic'
+    else:
+        return None
+    
+def valid_mecabfile_p(FP,DicOrCorpus):
+    assert any(DicOrCorpus==Type for Type in ('dic','corpus'))
+    valid_p=valid_corpusline_p if DicOrCorpus=='corpus' else valid_dicline_p
+    with open(FP) as FSr:
+        for LiNe in FSr:
+            if not valid_p(LiNe):
+                return False
+    return True
+
+def valid_dicline_p(LiNe):
+    Line=LiNe.strip()
+    if ' ' in Line or '\t' in Line:
+        return False
+    elif ',' not in Line:
+        return False
+    else:
+        LineEls=Line.split(',')
+        if len(LineEls)<5:
+            return False
+        elif any(not LineEl.isdigit() for LineEl in LineEls[1-3]):
+            return False
+        else:
+            return True
+
+def valid_corpusline_p(LiNe):
+    Line=LiNe.strip()
+    if Line=='EOS':
+        return True
+    elif ' ' in Line or '\t' not in Line:
+        return False
+    elif len(Line.split('\t')[1].split(','))<=2:
+        return False
+    else:
+        return True    
+    
+def decompose_mecabline(Line,DicOrCorpus='corpus'):
+    assert DicOrCorpus=='dic' or DicOrCorpus=='corpus'
+    
+    if DicOrCorpus=='corpus':
+        Orth,Rest=Line.strip().split('\t')
+        Fts=Rest.split(',')
+        Costs=None
+    else:
+        Orth=LineEls[0]
+        Costs=tuple(LineEls[1-3])
+        Fts=LineEls[4:].split(',')
+    return (Orth,Fts,Costs)
 
 def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,IdentityAtts={'orth','cat','infform'}):
     SrcFtSet,TgtFtSet=set(SrcFts),set(TgtFts)
@@ -1009,8 +1112,8 @@ class MecabWdParse(WordParse):
         #self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
         FtStrs=[]
         for Ft in self.inherentatts[1:]:
-            Val=self.__dict__[Ft]
-            FtStr='*' if Val is None else str(Val) 
+#            Val=self.__dict__[Ft]
+            FtStr='*' if Ft not in self.__dict__.keys() else str(self.__dict__[Ft]) 
             FtStrs.append(FtStr)
         FtStr=','.join(FtStrs)
 #            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
