@@ -93,101 +93,137 @@ class Tree:
 
         return CompPaths
             
-def extract_differences_withinresource(ResFP,EssFtNames,OrderedFtNames,Debug=False):
-    SoFar={}
-    CorD=dic_or_corpus(ResFP)
+def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
+    DiffEls=PrvDiffDic
+    CorD=DicOrCorpus if DicOrCorpus is not None else dic_or_corpus(ResFP,FullCheckP=False)
+    if CorD is None:
+        sys.exit(ResFP+' not identified either as corpus or dic\n')
+    PConsts=myModule.prepare_progressconsts(ResFP,KnownCnt=ResLineCnt)
+    MSs=None
     with open(ResFP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
-            if Debug and Cntr>1 and Cntr%10000==0:
-                sys.stderr.write(str(Cntr)+'\n')
+            Linum=Cntr+1
+            if Cntr!=0 and Cntr%100000==0:
+                MSs=myModule.progress_counter(MSs,PConsts,Cntr)
             if CorD=='corpus' and LiNe=='EOS\n':
                 continue
             Line=LiNe.strip()
             try:
                 EssFts=pick_feats_fromline(Line,EssFtNames,InhFtNames=OrderedFtNames,DicOrCorpus=CorD,ValueOnlyP=True)
             except:
-                pick_feats_fromline(Line,EssFtNames,Fts=OrderedFtNames,CorpusOrDic=CorD)
-            if EssFts not in SoFar.keys():
-                SoFar[EssFts]={Line:1}
-            elif Line in SoFar[EssFts].keys():
-                SoFar[EssFts].update({Line:1})
+                pick_feats_fromline(Line,EssFtNames,InhFtNames=OrderedFtNames,DicOrCorpus=CorD)
+            if EssFts not in DiffEls.keys():
+                DiffEls[EssFts]={Line:{ResFN:[Linum]}}
+            elif Line not in DiffEls[EssFts].keys():
+                DiffEls[EssFts][Line].update({Line:{ResFN:[Linum]}})
             else:
-                SoFar[EssFts][Line]+=1
-    DiffEls={Stuff:LinesTimes for (Stuff,LinesTimes) in SoFar.items() if len(LinesTimes.keys())>=2}
+                DiffEls[EssFts][Line][ResFN].append(Linum)
+
     return DiffEls
     
-def extract_differences_tworesources(Res1FP,Res2FP,EssFtNames,OrderedFtNames):
-    def common_processing(LiNe,DicOrCorpus):
-        if CorD=='corpus' and LiNe=='EOS\n':
-            return 'passthru'
-        else:
-            Line=LiNe.strip()
-            return pick_feats_fromline(Line,EssFtNames,Fts=OrderedFtNames,CorpusOrDic=CorD,ValueOnlyP=True)
-
+def extract_resdiffs(ResFPs,EssFtNames,OrderedFtNames,ResLineCnts=None,ResTypes=None):
     assert all(EssFt in OrderedFtNames for EssFt in EssFtNames)
     
-    LargerFP,SmallerFP=(Res1FP,Res2FP) if sys.getsizeof(Res1FP)>sys.getsizeof(Res2FP) else (Res2FP,Res1FP)
-    CorD=dic_or_corpus(SmallerFP)
-    EssLineDic={}
-    with open(SmallerFP) as FSr:
-        for LiNe in FSr:
-            Rtn=common_processing(LiNe,CorD)
-            if Rtn=='passthru':
-                continue
-            else:
-                if Rtn not in EssLineDic.keys():
-                    EssLineDic[Rtn]=decompose_mecabline(LiNe.strip(),CorD)[1]
-    DiffDic={}
-    CorD=dic_or_corpus(LargerFP,FullCheckP=False)
-    FndCnt=0;EqualCnt=0;UnifiedCnt=0
-    with open(LargerFP) as FSr:
-        for LiNe in FSr:
-            Rtn=common_processing(LiNe,CorD)
-            if Rtn=='passthru':
-                continue
-            elif Rtn not in DiffDic.keys() and Rtn in EssLineDic.keys():
-                FndCnt+=1
-                Fts2=decompose_mecabline(LiNe.strip(),CorD)[1]
-                Fts1=EssLineDic[Rtn]
-                if Fts1!=Fts2:
-                    DiffInds=diffinds_two_ftsets(Fts1,Fts2)
-                    (UnifiableDiffInds,NonUnifiableDiffInds)=DiffInds
-                    Which=None
-                    PronInd=len(Fts1)-1
-                    if PronInd in NonUnifiableDiffInds:
-                        Which=choose_pronunciation(Fts1[-1],Fts2[-1])
-                        if Which==0:
-                            Normed=Fts2[:-1]+(Fts1[-1],)
-                        elif Which==1:
-                            Normed=Fts1[:-1]+(Fts2[-1],)
-                        
-                    if NonUnifiableDiffInds==[PronInd] and Which is not None:
-                        Unified=Normed
-                    else:
-                        if NonUnifiableDiffInds:
-                            Unified=None 
-                        elif Which==0:
-                            Unified=unify_two_ftsets(Normed,Fts2)
-                        elif Which==1:
-                            Unified=unify_two_ftsets(Fts1,Normed)
-                        elif Which is None:
-                            Unified=unify_two_ftsets(Fts1,Fts2)
-                    if Unified is None and NonUnifiableDiffInds==[PronInd-1]:
-                        OrgLemma=Fts1[PronInd-1]
-                        CmdEls=['echo ',OrgLemma,'| kakasi -i utf8 -o utf8 -JH']
-                        Cmd=' '.join(CmdEls)
-                        Proc=subprocess.Popen(Cmd,shell=True,stdout=subprocess.PIPE)
-                        HOrgLemma=Proc.communicate()[0].decode().strip()
-                        if HOrgLemma==Fts2[PronInd-1]:
-                            Unified=unify_two_ftsets(Fts1,Fts2[:PronInd-1]+(OrgLemma,)+Fts2[-1:])
-                    if Unified:
-                        UnifiedCnt+=1
-                        
-                    DiffDic[Rtn]=((Fts1,Fts2),DiffInds,Unified)
-                else:
-                    EqualCnt+=1
+    ResLineCnts=[myModule.get_linecount(ResFP) for ResFP in ResFPs] if ResLineCnts is None else ResLineCnts
+    ResLineCnts=tuple(ResLineCnts)
+    assert (len(ResLineCnts)==len(ResFPs))
 
+    CorDs=[mtools.dic_or_corpus(ResFP) for ResFP in ResFPs] if CorDs is None else CorDs
+    CorDs=tuple(CorDs)
+    assert (len(CorDs)==len(ResFPs))
+
+    ResFPsTypes=list(zip(ResFPs,CorDs))
+
+    DiffDic={}
+    for ResFP in ResFPs:
+        DiffDic=extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic=DiffDic)
     return DiffDic
+
+
+def normalise_unify_ftsets(FtSets):
+    SoFar=FtSets[0]
+    for FtSet in FtSets[1:]:
+        SoFar=normalise_unify_twoftsets(SoFar,FtSet)
+        if SoFar is None:
+            break
+    return SoFar
+
+def normalise_unify_twoftsets(Fts1,Fts2):
+    DiffInds=diffinds_two_ftsets(Fts1,Fts2)
+    (UnifiableDiffInds,NonUnifiableDiffInds)=DiffInds
+    Which=None
+    PronInd=len(Fts1)-1
+    if PronInd in NonUnifiableDiffInds:
+        Which=choose_pronunciation(Fts1[-1],Fts2[-1])
+        if Which==0:
+            Normed=Fts2[:-1]+(Fts1[-1],)
+        elif Which==1:
+            Normed=Fts1[:-1]+(Fts2[-1],)
+
+    if NonUnifiableDiffInds==[PronInd] and Which is not None:
+        Unified=Normed
+    else:
+        if NonUnifiableDiffInds:
+            Unified=None 
+        elif Which==0:
+            Unified=unify_two_ftsets(Normed,Fts2)
+        elif Which==1:
+            Unified=unify_two_ftsets(Fts1,Normed)
+        elif Which is None:
+            Unified=unify_two_ftsets(Fts1,Fts2)
+    if Unified is None and NonUnifiableDiffInds==[PronInd-1]:
+        NormedLemma=normalise_twolemmata(Fts1[PronInd-1],Fts2[PronInd-1])
+        if NormedLemma:
+            Which=0 if NormedLemma==Fts1[PronInd-1] else 1
+            if Which==0:
+                Unified=unify_two_ftsets(Fts1,Fts2[:PronInd-1]+(NormedLemma,)+Fts2[-1:])
+            else:
+                Unified=unify_two_ftsets(Fts1[:PronInd-1]+(NormedLemma,)+Fts1[-1:],Fts2)
+    return Unified
+
+def normalise_twolemmata(Lemma1,Lemma2):
+    Lemmata=(Lemma1,Lemma2)
+    # pick the kanji version if only one of them is
+    if all(myModule.all_of_chartypes_p(Lemma,['hiragana']) for Lemma in Lemmata):
+        return normalise_hiragana_twolemmata(Lemma1,Lemma2)
+    else:
+        HanInds=[Ind for (Ind,Lemma) in enumerate(Lemmata) if myModule.at_least_one_of_chartypes_p(Lemma,['han'])]
+        if any(len(HanInds)==Len for Len in (0,2)):
+            return None
+        else:
+            HanInd=HanInds[0]
+            NonHanInd=1 if HanInd==0 else 0
+            if not myModule.all_of_chartypes_p(Lemmata[NonHanInd],['hiragana']):
+                return None
+            else:
+                HanLemma=Lemmata[HanInd];KanaLemma=Lemmata[NonHanInd]
+                RenderedKanaLemma=myModule.render_kana(HanLemma)
+                if KanaLemma==RenderedKanaLemma:
+                    return HanLemma
+                else:
+                    return None
+
+ContractionMap=[('じゃ','では')]              
+def normalise_hiragana_twolemmata(HiraganaLemma1,HiraganaLemma2):
+    Lemmata=(HiraganaLemma1,HiraganaLemma2)
+    if len(HiraganaLemma1)!=len(HiraganaLemma2):
+        return None
+    else:
+    #CharsWithRelatives=jp_morph.CharsWithRelatives
+        VoicedCnts=[sum([myModule.kana2kana(Char) in jp_morph.VoicedHalfVoiced for Char in list(Lemma)]) for Lemma in Lemmata]
+        VoicedInd=VoicedCnts.index(max(VoicedCnts))
+        TgtInd=1 if VoicedInd==0 else 0
+        VoicedLemma=Lemmata[VoicedInd];TgtLemma=Lemmata[TgtInd]
+        for Cntr,Char in enumerate(VoicedLemma):
+            UnvoicedChar=jp_morph.unvoice_char(Char,StrictP=True)
+            if UnvoicedChar:
+                L=list(VoicedLemma)
+                L[Cntr]=UnvoicedChar
+                UnvoicedCand=''.join(L)
+                if UnvoicedCand==TgtLemma:
+                    return TgtLemma
+        return None       
+    
 
 def choose_pronunciation(Str1,Str2):
     if 'ー' in Str1:
@@ -479,7 +515,12 @@ def get_line(FP,LiNum):
         return None
 
 def dic_or_corpus(FP,FullCheckP=True):
-    CheckUpTo=float('inf') if FullCheckP else 5000
+    if FullCheckP:
+        CheckUpTo=float('inf')
+        if sys.getsizeof(FP)>100:
+            sys.stderr.write('[dic_or_corpus] full check is being made. this may take time\n')
+    else:
+        CheckUpTo=5000
     if valid_mecabfile_p(FP,'corpus',CheckUpTo=CheckUpTo):
         return 'corpus'
     elif valid_mecabfile_p(FP,'dic',CheckUpTo=CheckUpTo):
@@ -502,12 +543,14 @@ def valid_mecabfile_p(FP,DicOrCorpus,CheckUpTo=float('inf')):
             if DicOrCorpus=='corpus' and LiNe=='EOS\n':
                 continue
             if not valid_p(LiNe):
+                sys.stderr.write(' '.join(['Offending line:',str(Cntr+1),LiNe]))
                 return False
             if not LengthCntd:
                 FtLen=feat_count_line(LiNe.strip(),DicOrCorpus)
                 LengthCntd=True
             else:
                 if FtLen!=feat_count_line(LiNe.strip(),DicOrCorpus):
+                    sys.stderr.write(' '.join(['Offending line:',str(Cntr+1),LiNe]))
                     return False
 
 
@@ -752,7 +795,6 @@ def pick_feats_fromline(Line,TgtFtNames,InhFtNames=None,DicOrCorpus='corpus',Val
     FullIndsFts=InhFtIndsNames if DicOrCorpus=='corpus' else add_costs(InhFtIndsNames)
     FullIndsFts=bidict(FullIndsFts)
 
-    InhFtCnt=len(FullIndsFts)
     Line=Line.rstrip()
     if Line.startswith(','):
         Line=Line.replace(',','、',1)
@@ -760,8 +802,8 @@ def pick_feats_fromline(Line,TgtFtNames,InhFtNames=None,DicOrCorpus='corpus',Val
     LineElCnt=len(LineEls)
     LineInhFtEls=LineEls[:1]+LineEls[4:] if DicOrCorpus=='dic' else LineEls
     LineInhFtCnt=len(LineInhFtEls)
-
-    assert(LineInhFtCnt==InhFtCnt)
+    #checking line has the specified number of feats and costs
+    assert(LineInhFtCnt==len(InhFtNames) and len(LineEls)==len(FullIndsFts))
 
     TgtInds=[ Ind for (Ind,FtName) in FullIndsFts.items() if FtName in TgtFtNames ]
 
@@ -872,7 +914,7 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','infform','infpat','pronunciation')):
+    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
         super().__init__(AVPairs)
         self.inherentatts=InhAtts
         self.identityatts=IdentityAtts
