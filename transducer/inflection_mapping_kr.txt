@@ -1,0 +1,12 @@
+[['vowel-connect',{'stem':'주','vowel':'줘','lemma':'주다','liul':'줄'}],
+['stem-connect',{'stem':'시','vowel':'세','lemma':'시다','liul':'실'}],
+['auxV',{'stem':'보','vowel':'봐','lemma':'보다','liul':'볼'}],
+['go-connect',{'stem':'싶','vowel':'싶어','lemma':'싶다','liul':'싶을'}],
+['go',{'lemma':'고'}],
+['finalPart',{'lemma':'요'}],
+['finalPart',{'lemma':'래'}],
+['mainV',{'stem':'하','vowel':'해','lemma':'하다','liul':'할'}],
+['mainV',{'stem':'아리','vowel':'아려','lemma':'아리다','liul':'아릴'}],
+['mainV',{'stem':'열','vowel':'열어','lemma':'열다','liul':'열을'}],
+['mainV',{'stem':'찾','vowel':'찾아','lemma':'찾다','liul':'찾을'}]
+]
