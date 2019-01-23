@@ -57,10 +57,17 @@ class Transducer:
             Copy.curpos=Pos
             Copies.append(Copy)
         return Copies
-    def find_labelclasses_for_periphery(self,Str,Vocab,Reverse=False):
+    def find_labelclasses_for_periphery(self,Str,Vocab,Reverse=False,Debug=False):
         FndLCs=[];FndMorphs=[]
         for (LC,Morphs) in Vocab.items():
+            if Debug:    
+                print(LC)
+#                for Morph in Morphs:
+  #                  print(Morph)
             FndMorph=next((Morph for Morph in Morphs if Str.endswith(Morph)),None)
+            if Debug:
+                Msg='FOUND!!' if FndMorph else 'not found'
+                print(Msg)
             if FndMorph:
                 FndLCs.append(LC)
                 FndMorphs.append(FndMorph)
@@ -69,13 +76,14 @@ class Transducer:
         
 
 
-def traverse_transducer(OrgTrans,OrgStr,Reverse=False):
+def traverse_transducer(OrgTrans,OrgStr,Reverse=False,Debug=False):
     if not isinstance(OrgTrans,Transducer):
         sys.exit('not a transducer')
     Transes=[];Str=OrgStr
     for Trans in OrgTrans.generate_started_copy():
         while Str:
-            LCs,Strs=Trans.find_labelclasses_for_periphery(Str,Trans.vocab,Reverse=Reverse)
+            if Debug: print(Str)
+            LCs,Strs=Trans.find_labelclasses_for_periphery(Str,Trans.vocab,Reverse=Reverse,Debug=Debug)
             if Strs:
                 Rtn=Trans.traverse_next_pos(LCs[0],Strs[0])
                 if not Rtn:
@@ -97,7 +105,7 @@ def extract_infform(TgtInfFormName,Str,VLexs):
             return VLex.__dict__[TgtInfFormName]
     return None
 
-def make_transducer_fromjsons(TransCfgJsonFP,InfJsonFP):        
+def make_transducer_fromjsons(TransCfgJsonFP,InfJsonFP,Debug=False):        
     Objs=[]
     for JsonFP in (TransCfgJsonFP,InfJsonFP):
         with open(JsonFP) as FSr:
@@ -125,9 +133,9 @@ def make_transducer(EdgeCfgs,FinalPoss,Vocab):
         Edges.append(Edge(Org,Dst,LC))
     return Transducer(Edges,FinalPoss,Vocab)
 
-def parse_with_transducer(Str,Trans,InfForm,VLexs,ReverseP=False):
+def parse_with_transducer(Str,Trans,InfForm,VLexs,ReverseP=False,Debug=True):
 
-    NewTranses=traverse_transducer(Trans,Str,Reverse=ReverseP)
+    NewTranses=traverse_transducer(Trans,Str,Reverse=ReverseP,Debug=Debug)
     if NewTranses:
         ResTrans,NotConsumedStr=NewTranses[0]
         LstSeg=ResTrans.pathstates[-1][-1]
@@ -149,8 +157,9 @@ def main():
     Psr.add_argument('transcfg_jsonfp')
     Psr.add_argument('inf_jsonfp')
     Psr.add_argument('--reverse',action='store_true')
+    Psr.add_argument('--debug',action='store_true')
     Args=Psr.parse_args()
-    myTrans,CatsLexSets=make_transducer_fromjsons(Args.transcfg_jsonfp,Args.inf_jsonfp)
+    myTrans,CatsLexSets=make_transducer_fromjsons(Args.transcfg_jsonfp,Args.inf_jsonfp,Debug=Args.debug)
     LexsMainV=CatsLexSets['mainV']
     Results=[]
     with open(Args.str_fp) as FSr:
@@ -159,11 +168,11 @@ def main():
             if not Line:
                 continue
             OrgSent=LiNe.strip().split('\t')[0].decode('utf8')
-            print(OrgSent)
-            print()
+            #print(OrgSent)
+            #print()
             for InfFN in LexsMainV[0].allatts:
                 try:
-                    Result=parse_with_transducer(OrgSent,myTrans,InfFN,LexsMainV,ReverseP=Args.reverse)
+                    Result=parse_with_transducer(OrgSent,myTrans,InfFN,LexsMainV,ReverseP=Args.reverse,Debug=Args.debug)
                     Results.append(Result)
                 except:
                     parse_with_transducer(OrgSent,myTrans,InfFN,InfWds,ReverseP=Args.reverse)

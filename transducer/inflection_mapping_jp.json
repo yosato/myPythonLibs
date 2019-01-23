@@ -1,0 +1,207 @@
+[
+[
+  "mainV",
+  {
+    "mizen": "ながさ",
+    "renyo": "ながし",
+    "shushi": "ながす",
+    "rentai": "ながす",
+    "katei": "ながせ",
+    "meirei": "ながせ",
+    "mizen-vol": "ながそ",
+    "renyo-onbin": "ながし"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "探さ",
+    "renyo": "探し",
+    "shushi": "探す",
+    "rentai": "探す",
+    "katei": "探せ",
+    "meirei": "探せ",
+    "mizen-vol": "探そ",
+    "renyo-onbin": "探し"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "行か",
+    "renyo": "行き",
+    "shushi": "行く",
+    "rentai": "行く",
+    "katei": "行け",
+    "meirei": "行け",
+    "mizen-vol": "行こ",
+    "renyo-onbin": "行っ"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "かけ",
+    "renyo": "かけ",
+    "shushi": "かける",
+    "rentai": "かける",
+    "katei": "かけれ",
+    "meirei": "かけろ",
+    "mizen-vol": "かけよ",
+    "renyo-onbin": "かけ"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "し",
+    "renyo": "し",
+    "shushi": "する",
+    "rentai": "する",
+    "katei": "すれ",
+    "meirei": "しろ",
+    "mizen-vol": "しよ",
+    "renyo-onbin": "し"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "来",
+    "renyo": "来",
+    "shushi": "来る",
+    "rentai": "来る",
+    "katei": "来れ",
+    "meirei": "来い",
+    "mizen-vol": "来よ",
+    "renyo-onbin": "来"
+  }
+],
+[
+  "mainV",
+  {
+    "mizen": "着",
+    "renyo": "着",
+    "shushi": "着る",
+    "rentai": "着る",
+    "katei": "着れ",
+    "meirei": "着ろ",
+    "mizen-vol": "着よ",
+    "renyo-onbin": "着"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "ほしく",
+    "renyo": "ほしく",
+    "shushi": "ほしい",
+    "rentai": "ほしい",
+    "katei": "ほしけれ",
+    "meirei": "ほしかれ",
+    "mizen-vol": "ほしかろ",
+    "renyo-onbin": "ほしく"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "いただか",
+    "renyo": "いただき",
+    "shushi": "いただく",
+    "rentai": "いただく",
+    "katei": "いただけ",
+    "meirei": "いただけ",
+    "mizen-vol": "いただこ",
+    "renyo-onbin": "いただい"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "くれ",
+    "renyo": "くれ",
+    "shushi": "くれる",
+    "rentai": "くれる",
+    "katei": "くれれ",
+    "meirei": "くれろ",
+    "mizen-vol": "くれよ",
+    "renyo-onbin": "くれ"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "ほしく",
+    "renyo": "ほしく",
+    "shushi": "ほしい",
+    "rentai": "ほしい",
+    "katei": "ほしけれ",
+    "meirei": "ほしかれ",
+    "mizen-vol": "ほしかろ",
+    "renyo-onbin": "ほしく"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "ください",
+    "renyo": "ください",
+    "shushi": "ください",
+    "rentai": "ください",
+    "katei": "ください",
+    "meirei": "ください",
+    "mizen-vol": "ください",
+    "renyo-onbin": "ください"
+  }
+],
+[
+  "aux",
+  {
+    "mizen": "ませ",
+    "renyo": "まし",
+    "shushi": "ます",
+    "rentai": "ます",
+    "katei": "ますれ",
+    "meirei": "ませよ",
+    "mizen-vol": "ましょ",
+    "renyo-onbin": "まし"
+  }
+],
+[
+  "finalPart",
+  {
+    "lemma": "か"
+  }
+],
+[
+  "finalPart",
+  {
+    "lemma": "ね"
+  }
+],
+[
+  "negAux",
+  {
+    "lemma": "ん"
+  }
+],
+[
+  "negAux",
+  {
+    "lemma": "ない"
+  }
+],
+[
+  "joiner",
+  {
+    "lemma": "て"
+  }
+],
+[
+  "joiner",
+  {
+    "lemma": "で"
+  }
+]
+]
