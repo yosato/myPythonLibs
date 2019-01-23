@@ -1,5 +1,14 @@
-import sys,os,copy,imp,json,re
+import sys,os,copy,imp,json
 from collections import defaultdict
+
+class Lexeme:
+    def __init__(self,ParadigmMap):
+        AllForms=[];AllAtts=[]
+        for (InfFAtt,InfFVal) in ParadigmMap.items():
+            self.__dict__[InfFAtt]=InfFVal
+            AllForms.append(InfFVal);AllAtts.append(InfFAtt)
+        self.allforms=AllForms
+        self.allatts=AllAtts
 
 class Edge:
     def __init__(self,Org,Dst,LabelClass):
@@ -8,14 +17,15 @@ class Edge:
         self.destination=Dst
 
 class Transducer:
-    def __init__(self,Edges,FinalPoss,Vocab,SpaceP=False):
+    def __init__(self,Edges,FinalPoss,Vocab,SpaceP=True):
+        self.edges=Edges
         self.finalpositions=FinalPoss
         self.intermediatepositions=set([Edge.destination for Edge in Edges if Edge.destination not in self.finalpositions])
         self.edges=Edges if not SpaceP else Edges+self.space_edges()
         self.curpos=0
         if SpaceP:
-            Vocab.update([('space',' ')])
-        self.vocab=Vocab 
+            Vocab.update([(u'space',' ')])
+        self.vocab=Vocab
         self.pathstates=[]
         self.finalp=False
     def space_edges(self):
@@ -35,8 +45,8 @@ class Transducer:
             self.pathstates.append((LC,Str,))
             if self.curpos in self.finalpositions:
                 self.finalp=True
-        else:
-            sys.stderr.write('No move possible\n')
+        #else:
+         #   sys.stderr.write('No move possible\n')
         return NextPoss
 
     def generate_started_copy(self):
@@ -57,35 +67,10 @@ class Transducer:
 
         return FndLCs,FndMorphs
         
-def main0(StrFP,TransCfgJson,InfJsonFP,InfForm,ReverseP=False,SpaceP=False):
-    myTrans=make_transducer(TransCfgJson,InfJsonFP,SpaceP=SpaceP)
-    Results=stem_inflect_strings(StrFP,myTrans,InfForm,ReverseP=ReverseP)
 
-    return Results
-
-
-def stem_inflect_strings(StrFP,myTrans,InfForm,ReverseP=False):
-    NewStrs=[]
-    with open(StrFP) as FSr:
-        for LiNe in FSr:
-            Line=re.sub(r'[ 　]+',' ',LiNe).strip()
-            NewStrs.append(stem_inflect_verb(Line,myTrans,InfForm,ReverseP=ReverseP))
-    return NewStrs
-
-def stem_inflect_mainverb(Str,myTrans,InfForm,ReverseP=False):
-    Transes=traverse_transducer(myTrans,Str,Reverse=ReverseP)
-    if Transes:
-        ResTrans,RemStr=Transes[0]
-        LstSeg=ResTrans.pathstates[-1][-1]
-        Rest=[Tuple[1] for Tuple in ResTrans.pathstates[:-1]][::-1]
-        NewSeg=extract_infform(InfForm,LstSeg,InfWds)
-        if NewSeg:
-            NewStr=RemStr+NewSeg
-            RemStuff=''.join(Rest)
-    return NewStr,RemStuff
 
 def traverse_transducer(OrgTrans,OrgStr,Reverse=False):
-    if type(OrgTrans).__name__!='Transducer':
+    if not isinstance(OrgTrans,Transducer):
         sys.exit('not a transducer')
     Transes=[];Str=OrgStr
     for Trans in OrgTrans.generate_started_copy():
@@ -106,54 +91,84 @@ def traverse_transducer(OrgTrans,OrgStr,Reverse=False):
 
     return Transes
         
-def extract_infform(TgtInfFormName,Str,InfTable):
-    for InfPatName,Dic in InfTable:
-        if Str in Dic.values():
-            return Dic[TgtInfFormName]
+def extract_infform(TgtInfFormName,Str,VLexs):
+    for VLex in VLexs:
+        if Str in VLex.allforms:
+            return VLex.__dict__[TgtInfFormName]
     return None
-        
-        
-def make_transducer(TransCfgJson,InfJsonFP,SpaceP=False):
+
+def make_transducer_fromjsons(TransCfgJsonFP,InfJsonFP):        
     Objs=[]
-    for JsonFP in (TransCfgJson,InfJsonFP):
+    for JsonFP in (TransCfgJsonFP,InfJsonFP):
         with open(JsonFP) as FSr:
-            Objs.append(json.loads(FSr.read()))
-    TransCfgs,InfWds=Objs
+            Str=FSr.read()
+            Obj=json.loads(Str)
+            Objs.append(Obj)
+    TransCfgs,OrgWdLs=Objs
 
     EdgeCfgs=TransCfgs['edges']
     FinalPoss=TransCfgs['finals']
+    CatsLexSets=defaultdict(list)
+    for WdCat,InfFormAttsVals in OrgWdLs:
+        CatsLexSets[WdCat].append(Lexeme(InfFormAttsVals))
+
     Vocab=defaultdict(list)
-    for InfWd in InfWds:
-        Vocab[InfWd[0]].extend(InfWd[1].values())
+    for (Cat,LexSet) in CatsLexSets.items():
+        AllForms=[El for Sublist in [Lex.allforms for Lex in LexSet] for El in Sublist]
+        Vocab[Cat].extend(AllForms)
+
+    return make_transducer(EdgeCfgs,FinalPoss,Vocab),CatsLexSets
+        
+def make_transducer(EdgeCfgs,FinalPoss,Vocab):
     Edges=[]
     for (Org,Dst,LC) in EdgeCfgs:
         Edges.append(Edge(Org,Dst,LC))
-    myTrans=Transducer(Edges,FinalPoss,Vocab,SpaceP=SpaceP)
-    return myTrans
+    return Transducer(Edges,FinalPoss,Vocab)
+
+def parse_with_transducer(Str,Trans,InfForm,VLexs,ReverseP=False):
+
+    NewTranses=traverse_transducer(Trans,Str,Reverse=ReverseP)
+    if NewTranses:
+        ResTrans,NotConsumedStr=NewTranses[0]
+        LstSeg=ResTrans.pathstates[-1][-1]
+        ConsumedStrs=[Tuple[1] for Tuple in ResTrans.pathstates[:-1]][::-1]
+        NewSeg=extract_infform(InfForm,LstSeg,VLexs)
+        if NewSeg:
+#            NewStr=RemStr+NewSeg
+            ConsumedStr=''.join(ConsumedStrs)
+            return NewSeg,ConsumedStr
+
+    else:
+        return None
 
 
 def main():
-    import argparse,json,re
+    import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('str_fp')
-    Psr.add_argument('transcfg_fp')
-    Psr.add_argument('inf_fp')
-    Psr.add_argument('infform')
+    Psr.add_argument('transcfg_jsonfp')
+    Psr.add_argument('inf_jsonfp')
     Psr.add_argument('--reverse',action='store_true')
-    Psr.add_argument('--allow-space',action='store_true')
     Args=Psr.parse_args()
-    if Args.inf_fp.endswith('.txt'):
-        List=eval(open(Args.inf_fp).read())
-        InfJsonFP=re.sub(r'\.txt$','.json',Args.inf_fp)
-        open(InfJsonFP,'wt').write(json.dumps(List,ensure_ascii=False,indent=2))
-    else:
-        InfJsonFP=Args.inf_fp
-    main0(Args.str_fp,Args.transcfg_fp,InfJsonFP,'renyo-onbin',ReverseP=Args.reverse,SpaceP=Args.allow_space)
+    myTrans,CatsLexSets=make_transducer_fromjsons(Args.transcfg_jsonfp,Args.inf_jsonfp)
+    LexsMainV=CatsLexSets['mainV']
+    Results=[]
+    with open(Args.str_fp) as FSr:
+        for LiNe in FSr:
+            Line=LiNe.strip()
+            if not Line:
+                continue
+            OrgSent=LiNe.strip().split('\t')[0].decode('utf8')
+            print(OrgSent)
+            print()
+            for InfFN in LexsMainV[0].allatts:
+                try:
+                    Result=parse_with_transducer(OrgSent,myTrans,InfFN,LexsMainV,ReverseP=Args.reverse)
+                    Results.append(Result)
+                except:
+                    parse_with_transducer(OrgSent,myTrans,InfFN,InfWds,ReverseP=Args.reverse)
+                
 
 
 if __name__=='__main__':
     main()
-
-
-
-    
