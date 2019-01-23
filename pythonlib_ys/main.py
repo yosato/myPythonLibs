@@ -4,6 +4,11 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+def rm_dir_content(Dir,Glob='*'):
+    Files=os.path.join(Dir,Glob)
+    for File in Files:
+        os.remove(File)
+
 #from stringproc import *
 
 #timeout = 10
@@ -23,10 +28,9 @@ def merge_tuples_withindex(Tuples):
         
 
 def merge_filenames(FNs,UpperBound=5):
-    assert all('/' not in FN for FN in FNs)
+    assert all('/' not in FN for FN in FNs), 'you need a filename, not path'
     Stems,Exts=merge_tuples_withindex([get_stem_ext(FN) for FN in FNs])
-    assert all(Ext==Exts[0] for Ext in Exts[1:])
-    Ext=Exts[0]
+    Ext=Exts[0] if all(Ext==Exts[0] for Ext in Exts[1:]) else '.'.join(Exts)
         
     StemStrs=[]
     for Cntr,Stem in enumerate(Stems):
@@ -445,9 +449,9 @@ def number_lines(FP,Ext='numbered',ExtRepl=False):
         FSw.write(NewLine)
     FSw.close()
 
-def ask_filenoexist_execute_pickle(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
+def ask_filenoexist_execute_pickle(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True,StoreEmptyP=False):
     Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=False)
-    # this means something was returned
+    # second return value is whether proc has beene executed
     if Response:
         if os.path.isfile(FP) and Backup:
             print(FP+' to be backed up with .bak extension')
@@ -458,7 +462,10 @@ def ask_filenoexist_execute_pickle(FP,Function,ArgsKArgs,Message='Use the old fi
         Pickle=load_pickle(FP)
         return Pickle,True
     else:
-        sys.exit('ask_filenoexist_execute_pickle: response empty, nothing to pickle, somehing wrong')
+        sys.stderr.write('ask_filenoexist_execute_pickle: response empty, nothing to pickle, somehing wrong\n')
+        if StoreEmptyP: # and issubclass(Response,collections.Collection):
+            dump_pickle(Response,FP)
+        return Response,True
 
 def jsonable_p(Obj,DirectP=True):
     JsonableAtoms=[ 'str', 'int', 'float' ]
@@ -707,6 +714,10 @@ def increment_diccount(OrgDic,Key,Step=1,Inset=True):
     if not Inset:
         return Dic
 
+def prepare_progresscounter_inputs(Tgt,KnownCnt=None,TgtType='filename'):
+    Cnt,DateTime=prepare_progressconsts(Tgt,KnownCnt=KnownCnt,TgtType=TgtType)
+    return create_percentage_milestones(Cnt),(Cnt,DateTime)
+    
 def create_percentage_milestones(UnitCnt):
     Milestones=[]
     Interval=100/UnitCnt
@@ -805,17 +816,16 @@ def warnprint(Str):
     print(Str)
 
 def check_exist_paths(FPs):
-    import os
+    Bool=True
     for FP in FPs:
         if not os.path.exists(FP):
             warnprint(FP+' does not exist')
-            Bool=False
             if os.path.isdir(os.path.dirname(FP)):
                 print('... but the upper dir exists')
             else:
-                print('... nor the upper fot')
-        else:
-            Bool=True
+                print('... nor the upper dir')
+                Bool=False
+
     return Bool
 
 #def do_something_and_comeback_fs(FS,FuncOrMethod):

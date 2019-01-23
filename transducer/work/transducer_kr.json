@@ -1,0 +1,17 @@
+{"edges":
+[[0, 1, "null"],
+[0, 2, "null"],
+[0, 4, "null"],
+[0, 6, "null"],
+[1, 1, "finalPart"],
+[1, 2,	"finalPart"],
+[2, 3,	"sida"],
+[3, 4,	"juda"],
+[6, 7,	"sipta"],
+    [7,8, "go"],
+    [8,9,"mainV"]
+    [4,5,"mainV"]
+]
+,
+"finals":[5,9]
+}

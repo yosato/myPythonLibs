@@ -9,7 +9,15 @@ imp.reload(myModule)
 imp.reload(jp_morph)
 imp.reload(correspondences)
 
-CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ぺ','べ',),'ホ':('ポ','ボ',)}
+CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ペ','ベ',),'ホ':('ポ','ボ',),'ア':('ァ',),'イ':('ィ',),'ウ':('ゥ','ヴ',),'エ':('ェ',),'オ':('ォ',),'ヤ':('ャ',),'ユ':('ュ',),'ヨ':('ョ',),'ツ':('ヅ','ッ',)}
+RelativesToChars={Rels:Char for (Char,Rels) in CharsWithRelatives.items()}
+RelativeToChar={}
+for Rels,Char in RelativesToChars.items():
+    for Rel in Rels:
+        RelativeToChar[Rel]=Char
+    
+CharsWithoutRelatives=list('ナニヌネノマミムメモラリルレロワ')
+EntryChars=list(CharsWithRelatives.keys())+CharsWithoutRelatives
 
 try:
     from ipdb import set_trace
@@ -24,11 +32,8 @@ HomeDir=os.getenv('HOME')
 DefFts=['orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation']
 DefFtsSmall=DefFts[:8]
 DefIndsFts={Ind:Ft for (Ind,Ft) in enumerate(DefFts)}
-DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
-DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
 # the reverse list from ft to ind
 DefFtsInds={ Ft:Ind for (Ind,Ft) in DefIndsFts.items() }
-DefLexFtsInds={ Ft:Ind for (Ind,Ft) in DefLexIndsFts.items() }
 InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
@@ -88,7 +93,180 @@ class Tree:
 
         return CompPaths
             
+def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
+    DiffEls=PrvDiffDic
+    CorD=DicOrCorpus if DicOrCorpus is not None else dic_or_corpus(ResFP,FullCheckP=False)
+    if CorD is None:
+        sys.exit(ResFP+' not identified either as corpus or dic\n')
+    PConsts=myModule.prepare_progressconsts(ResFP,KnownCnt=ResLineCnt)
+    MSs=None
+    with open(ResFP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            Linum=Cntr+1
+            if Cntr!=0 and Cntr%100000==0:
+                MSs=myModule.progress_counter(MSs,PConsts,Cntr)
+            if CorD=='corpus' and LiNe=='EOS\n':
+                continue
+            Line=LiNe.strip()
+            try:
+                EssFts=pick_feats_fromline(Line,EssFtNames,InhFtNames=OrderedFtNames,DicOrCorpus=CorD,ValueOnlyP=True)
+            except:
+                pick_feats_fromline(Line,EssFtNames,InhFtNames=OrderedFtNames,DicOrCorpus=CorD)
+            if EssFts not in DiffEls.keys():
+                DiffEls[EssFts]={Line:{ResFN:[Linum]}}
+            elif Line not in DiffEls[EssFts].keys():
+                DiffEls[EssFts][Line].update({Line:{ResFN:[Linum]}})
+            else:
+                DiffEls[EssFts][Line][ResFN].append(Linum)
 
+    return DiffEls
+    
+def extract_resdiffs(ResFPs,EssFtNames,OrderedFtNames,ResLineCnts=None,ResTypes=None):
+    assert all(EssFt in OrderedFtNames for EssFt in EssFtNames)
+    
+    ResLineCnts=[myModule.get_linecount(ResFP) for ResFP in ResFPs] if ResLineCnts is None else ResLineCnts
+    ResLineCnts=tuple(ResLineCnts)
+    assert (len(ResLineCnts)==len(ResFPs))
+
+    CorDs=[mtools.dic_or_corpus(ResFP) for ResFP in ResFPs] if CorDs is None else CorDs
+    CorDs=tuple(CorDs)
+    assert (len(CorDs)==len(ResFPs))
+
+    ResFPsTypes=list(zip(ResFPs,CorDs))
+
+    DiffDic={}
+    for ResFP in ResFPs:
+        DiffDic=extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic=DiffDic)
+    return DiffDic
+
+
+def normalise_unify_ftsets(FtSets):
+    SoFar=FtSets[0]
+    for FtSet in FtSets[1:]:
+        SoFar=normalise_unify_twoftsets(SoFar,FtSet)
+        if SoFar is None:
+            break
+    return SoFar
+
+def normalise_unify_twoftsets(Fts1,Fts2):
+    DiffInds=diffinds_two_ftsets(Fts1,Fts2)
+    (UnifiableDiffInds,NonUnifiableDiffInds)=DiffInds
+    Which=None
+    PronInd=len(Fts1)-1
+    if PronInd in NonUnifiableDiffInds:
+        Which=choose_pronunciation(Fts1[-1],Fts2[-1])
+        if Which==0:
+            Normed=Fts2[:-1]+(Fts1[-1],)
+        elif Which==1:
+            Normed=Fts1[:-1]+(Fts2[-1],)
+
+    if NonUnifiableDiffInds==[PronInd] and Which is not None:
+        Unified=Normed
+    else:
+        if NonUnifiableDiffInds:
+            Unified=None 
+        elif Which==0:
+            Unified=unify_two_ftsets(Normed,Fts2)
+        elif Which==1:
+            Unified=unify_two_ftsets(Fts1,Normed)
+        elif Which is None:
+            Unified=unify_two_ftsets(Fts1,Fts2)
+    if Unified is None and NonUnifiableDiffInds==[PronInd-1]:
+        NormedLemma=normalise_twolemmata(Fts1[PronInd-1],Fts2[PronInd-1])
+        if NormedLemma:
+            Which=0 if NormedLemma==Fts1[PronInd-1] else 1
+            if Which==0:
+                Unified=unify_two_ftsets(Fts1,Fts2[:PronInd-1]+(NormedLemma,)+Fts2[-1:])
+            else:
+                Unified=unify_two_ftsets(Fts1[:PronInd-1]+(NormedLemma,)+Fts1[-1:],Fts2)
+    return Unified
+
+def normalise_twolemmata(Lemma1,Lemma2):
+    Lemmata=(Lemma1,Lemma2)
+    # pick the kanji version if only one of them is
+    if all(myModule.all_of_chartypes_p(Lemma,['hiragana']) for Lemma in Lemmata):
+        return normalise_hiragana_twolemmata(Lemma1,Lemma2)
+    else:
+        HanInds=[Ind for (Ind,Lemma) in enumerate(Lemmata) if myModule.at_least_one_of_chartypes_p(Lemma,['han'])]
+        if any(len(HanInds)==Len for Len in (0,2)):
+            return None
+        else:
+            HanInd=HanInds[0]
+            NonHanInd=1 if HanInd==0 else 0
+            if not myModule.all_of_chartypes_p(Lemmata[NonHanInd],['hiragana']):
+                return None
+            else:
+                HanLemma=Lemmata[HanInd];KanaLemma=Lemmata[NonHanInd]
+                RenderedKanaLemma=myModule.render_kana(HanLemma)
+                if KanaLemma==RenderedKanaLemma:
+                    return HanLemma
+                else:
+                    return None
+
+ContractionMap=[('じゃ','では')]              
+def normalise_hiragana_twolemmata(HiraganaLemma1,HiraganaLemma2):
+    Lemmata=(HiraganaLemma1,HiraganaLemma2)
+    if len(HiraganaLemma1)!=len(HiraganaLemma2):
+        return None
+    else:
+    #CharsWithRelatives=jp_morph.CharsWithRelatives
+        VoicedCnts=[sum([myModule.kana2kana(Char) in jp_morph.VoicedHalfVoiced for Char in list(Lemma)]) for Lemma in Lemmata]
+        VoicedInd=VoicedCnts.index(max(VoicedCnts))
+        TgtInd=1 if VoicedInd==0 else 0
+        VoicedLemma=Lemmata[VoicedInd];TgtLemma=Lemmata[TgtInd]
+        for Cntr,Char in enumerate(VoicedLemma):
+            UnvoicedChar=jp_morph.unvoice_char(Char,StrictP=True)
+            if UnvoicedChar:
+                L=list(VoicedLemma)
+                L[Cntr]=UnvoicedChar
+                UnvoicedCand=''.join(L)
+                if UnvoicedCand==TgtLemma:
+                    return TgtLemma
+        return None       
+    
+
+def choose_pronunciation(Str1,Str2):
+    if 'ー' in Str1:
+        return 0
+    elif 'ー' in Str2:
+        return 1
+    elif 'ヲ' in Str1:
+        return 1
+    elif 'ヲ' in Str2:
+        return 0
+    elif Str1=='ワ' and Str2=='ハ':
+        return 0
+    elif Str2=='ワ' and Str1=='ハ':
+        return 1
+    else:
+        return None
+    
+    
+
+def unify_two_ftsets(FtSet1,FtSet2):
+    Unified=[]
+    for Ind,(Ft1,Ft2) in enumerate(zip(FtSet1,FtSet2)):
+        if Ft1==Ft2:
+            Unified.append(Ft1)
+        elif Ft1=='*' and Ft2!='*':
+            Unified.append(Ft2)
+        elif Ft1!='*' and Ft2=='*':
+            Unified.append(Ft1)
+        else:
+            return None
+
+    return tuple(Unified)
+
+def diffinds_two_ftsets(FtSet1,FtSet2):
+    Inds=[[],[]]
+    for Ind,(Ft1,Ft2) in enumerate(zip(FtSet1,FtSet2)):
+        if Ft1!=Ft2:
+            if any(Ft=='*' for Ft in (Ft1,Ft2)):
+                Inds[0].append(Ind)
+            else:
+                Inds[1].append(Ind)
+    return Inds
+    
 def count_head_charrep(TgtChar,Str):
     Cnt=0
     for Char in Str:
@@ -177,17 +355,20 @@ def sort_dic(DicFP,ColNum,OutFP=None,InLineP=False):
     if not os.path.isfile(DicFP) or not os.path.isdir(os.path.dirname(OutFP)):
         sys.exit('file does not exist')
     TmpOutFP=DicFP+'.tmp'
-    ShellCmd=' '.join(["grep -v ',記号,' ",DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
-    Proc=subprocess.Popen(ShellCmd,shell=True)
-    Proc.communicate()
+#    TmpFPForNoReading=DicFP+'.noread'
+ #   ShellCmd=' '.join(["sed -i '/\* *$/p'",DicFP,'>',TmpFPForNoReading])
+  #  subprocess.Popen(ShellCmd,shell=True).communicate()
+    ShellCmd=' '.join(['sed',"'/\* *$/d'",DicFP,'|','LANG=C','sort','-t,','-k',NumStr,'>',TmpOutFP])
+    subprocess.Popen(ShellCmd,shell=True).communicate()
     if InLineP:
         OutFP=DicFP
     elif OutFP is None:
         OutFP=DicFP+'.out'
 
-    
-    shutil.copy(TmpOutFP,OutFP)
+    if InLineP:
+        shutil.copy(TmpOutFP,OutFP)
     os.remove(TmpOutFP)
+
  #   StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
 
 def deduplicate_list(seq):
@@ -195,75 +376,119 @@ def deduplicate_list(seq):
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
 
-
+def divide_dic_into_alphdics(DicFPWhole,FPsPerChar,RelToChar):
+    OrgTotal=myModule.get_linecount(DicFPWhole)
+    CharsFSws={EntryChar:open(FP,'wt') for (EntryChar,FP) in FPsPerChar.items() }
+    
+    with open(DicFPWhole) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if Cntr!=0 and Cntr%10000==0:
+                print(str(Cntr)+' '+str(OrgTotal))
+            StartChar=pick_feats_fromline(LiNe.strip(),['reading'],DicOrCorpus='dic')[0][1][0]
+            if StartChar in EntryChars:
+                myFSw=CharsFSws[StartChar]
+            elif StartChar in RelToChar.keys():
+                myFSw=CharsFSws[RelToChar[StartChar]]
+            else:
+                myFSw=CharsFSws['outsiders']
+            myFSw.write(LiNe)
+    for FSw in CharsFSws.values():
+        FSw.close()
+    ResTotal=0
+    for FP in FPsPerChar.values():
+        ResTotal+=myModule.get_linecount(FP)
+    
+    assert(OrgTotal==ResTotal)    
  
-def create_indexed_dic(DicDir,Lang='jp'):
+def create_alph_objdics(DicDir,Lang='jp',RedoSrc=False):
     DicFPs=glob.glob(os.path.join(DicDir,'*.csv'))
     assert DicFPs
-    assert all(dic_or_corpus(DicFP)=='dic' for DicFP in DicFPs)
+    assert all(dic_or_corpus(DicFP,FullCheckP=False)=='dic' for DicFP in DicFPs)
     SandboxOutputDir=os.path.join(DicDir,'objdics')
+    SandboxSrcDir=os.path.join(DicDir,'srcdics')
     if not os.path.isdir(SandboxOutputDir):
         os.makedirs(SandboxOutputDir)
+    if not os.path.isdir(SandboxSrcDir):
+        os.makedirs(SandboxSrcDir)
     else:
-        Files=glob.glob(SandboxOutputDir+'/*')
+        Files=glob.glob(SandboxOutputDir+'/*.objdic')
         if Files:
             for File in Files:
                 os.remove(File)
     # these are the original files, to be copied with '.tmp' ext        
     DicFNs=[os.path.basename(DicFP) for DicFP in DicFPs]
     #RestFPs=[];DicFNs=[os.path.basename(RestFP) for RestFP in RestFPs]
-    MgdFNStem=myModule.merge_filenames(DicFNs,UpperBound=10)
-    MgdFPStem=os.path.join(SandboxOutputDir,MgdFNStem)
-    MgdDicTmpFP=MgdFPStem+'.rest'
+    MgdFNStem=myModule.get_stem_ext(myModule.merge_filenames(DicFNs,UpperBound=10))[0]
+    MgdFPSrcStem=os.path.join(SandboxSrcDir,MgdFNStem)
+    MgdDicTmpFP=MgdFPSrcStem+'.rest'
+
+    # merging all the dics
     FSw=open(MgdDicTmpFP,'wt')
     for DicFP in DicFPs:
         with open(DicFP) as FSr:
             FSw.write(FSr.read())
     FSw.close()
+    shutil.copy(MgdDicTmpFP,MgdDicTmpFP+'.org')
+
+    FPsPerChar={EntryChar:MgdFPSrcStem+'.'+EntryChar+'.csv' for EntryChar in EntryChars }
+    FPsPerChar['outsiders']=MgdFPSrcStem+'.outsiders.csv'
+
+    if RedoSrc:
+        divide_dic_into_alphdics(MgdDicTmpFP,FPsPerChar,RelativeToChar)
         
-    sort_dic(MgdDicTmpFP,13,MgdDicTmpFP,InLineP=True)    # name of the new alph file stem    
-    if Lang=='jp':
+
+    #if Lang=='jp':
         # excluding rare stuff (separate file) and dakuten stuff (included in the nonvoiced ctrprt)
-        Chars=deduplicate_list([Char for Char in list(jp_morph.GojuonStrK) if Char not in list('\nンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヲ')][:-3])
-    for CharCntr,Char in enumerate(Chars):
-        sys.stderr.write('\nWords starting with '+Char+' sought\n')
 
-        MecabWdsPerChar=get_alphwords_fromdic(Char,MgdDicTmpFP)
+    for FPPerChar in FPsPerChar.values():
+        MecabWdsPerChar={}
+        with open(FPPerChar) as FSr:
+            for LiNe in FSr:
+                MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
+                MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
 
-        if MecabWdsPerChar:
-            sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
-            myModule.dump_pickle(MecabWdsPerChar,MgdFPStem+'.'+Char+'.objdic')
-        else:
-            sys.stderr.write('nothing found for '+Char+'\n')
+            if MecabWdsPerChar:
+                FPEls=FPPerChar.split('.')
+                SrcFPStem='.'.join(FPEls[:-1])
+                NewFPStem=change_dir_infp(SrcFPStem,5,'objdics')
+                Char=FPEls[-2]
+                sys.stderr.write('Alphabet dic for '+Char+' done, '+str(len(MecabWdsPerChar))+' entries\n')
+                myModule.dump_pickle(MecabWdsPerChar,NewFPStem+'.objdic')
+            else:
+                sys.stderr.write('nothing found for '+Char+'\n')
 
-    RestWds={}
-    with open(RestFile) as FSr:
-        for LiNe in FSr:
-            MecabWd=mecabline2mecabwd(LiNe.strip(),'dic')
-            RestWds[tuple(MecabWd.identityattsvals.values())]=MecabWd
-    os.remove(RestFile)
-    sys.stderr.write('Alphabet dic for outsiders done, '+str(len(RestWds))+' entries\n')
-    myModule.dump_pickle(RestWds,OutFPStem+'_outsiders')
-    
-
-def get_alphwords_fromdic(Char,RestFP):
+def change_dir_infp(FP,Num,Repl):
+    New=FP.strip().split('/')
+    New[Num]=Repl
+    return '/'.join(New)
+                
+def get_alphwords_fromdic(Chars,RestFP):
     MecabWdsPerChar={}
+    TmpFP=RestFP+'.tmp'
+    FSw=open(TmpFP,'wt')
 #    CharsWithRelatives=jp_morph.CharsWithRelatives
     with open(RestFP) as FSr:
                 Fnd=False
                 for LiNe in FSr:
                     Line=LiNe.strip()
-                    StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
+                    StartChar=dict(pick_feats_fromline(Line,['pronunciation'],DicOrCorpus='dic'))['pronunciation'][0][0]
 
-                    if Char==StartChar or (Char in CharsWithRelatives.keys() and StartChar in CharsWithRelatives[Char]):
+                    if StartChar in Chars:
                         if not Fnd:
                             Fnd=True
                         MecabWd=mecabline2mecabwd(Line,'dic')
                         MecabWdsPerChar[tuple(MecabWd.identityattsvals.values())]=MecabWd
                     else:
                         if Fnd:
+                            FSw.write(FSr.read())
+                            FSw.close()
+                            shutil.copy(TmpFP,RestFP)
+                            os.remove(TmpFP)
                             return MecabWdsPerChar
-
+                        FSw.write(LiNe)
+    FSw.close()
+    shutil.copy(TmpFP,RestFP)
+    os.remove(TmpFP)
     return MecabWdsPerChar
 
 def mecabline_p(Line):
@@ -279,35 +504,9 @@ def dicline_p(Line):
         return False
     else:
         return ',' in Line and '\t' not in Line
-
-def dic_or_corpus(FP):
-    RealLineCnt=0
-    with open(FP) as FSr:
-        for Cntr,LiNe in enumerate(FSr):
-            Line=LiNe.strip()
-            if not Line:
-                continue
-            else:
-                RealLineCnt+=1
-            if RealLineCnt==1:
-                if corpusline_p(Line):
-                    DorC='corpus'
-                elif dicline_p(Line):
-                    DorC='dic'
-                else:
-                    sys.stderr.write('offending line: 1st\n\n')
-                    return None
-            elif RealLineCnt>100:
-                break
-            else:
-                if DorC=='corpus' and not corpusline_p(Line):
-                    sys.stderr.write('offending line: '+Line+'\n')
-                    return None
-                elif DorC=='dic' and not dicline_p(Line):
-                    sys.stderr.write('offending line: '+Line+'\n')
-                    return None
-    return DorC
-
+def corpus_or_dic(FP,FullCheckP):
+    return dic_or_corpus(FP,FullCheckP)
+    
 def get_line(FP,LiNum):
     with open(FP) as FSr:
         for Cntr,LiNe in enumerate(FSr):
@@ -315,11 +514,88 @@ def get_line(FP,LiNum):
                 return LiNe.strip()
         return None
 
-def decompose_corpusline(CorpusLine):
-    assert '\t' in CorpusLine and ',' in CorpusLine
-    Orth,Rest=CorpusLine.strip().split('\t')
-    Fts=Rest.strip().split(',')
-    return [Orth,Fts]
+def dic_or_corpus(FP,FullCheckP=True):
+    if FullCheckP:
+        CheckUpTo=float('inf')
+        if sys.getsizeof(FP)>100:
+            sys.stderr.write('[dic_or_corpus] full check is being made. this may take time\n')
+    else:
+        CheckUpTo=5000
+    if valid_mecabfile_p(FP,'corpus',CheckUpTo=CheckUpTo):
+        return 'corpus'
+    elif valid_mecabfile_p(FP,'dic',CheckUpTo=CheckUpTo):
+        return 'dic'
+    else:
+        return None
+
+def feat_count_line(Line,DicOrCorpus):
+    _,Fts,_=decompose_mecabline(Line,DicOrCorpus)
+    return len(Fts)
+    
+def valid_mecabfile_p(FP,DicOrCorpus,CheckUpTo=float('inf')):
+    assert any(DicOrCorpus==Type for Type in ('dic','corpus'))
+    valid_p=valid_corpusline_p if DicOrCorpus=='corpus' else valid_dicline_p
+    LengthCntd=False
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if Cntr>CheckUpTo:
+                break
+            if DicOrCorpus=='corpus' and LiNe=='EOS\n':
+                continue
+            if not valid_p(LiNe):
+                sys.stderr.write(' '.join(['Offending line:',str(Cntr+1),LiNe]))
+                return False
+            if not LengthCntd:
+                FtLen=feat_count_line(LiNe.strip(),DicOrCorpus)
+                LengthCntd=True
+            else:
+                if FtLen!=feat_count_line(LiNe.strip(),DicOrCorpus):
+                    sys.stderr.write(' '.join(['Offending line:',str(Cntr+1),LiNe]))
+                    return False
+
+
+
+    return True
+
+def valid_dicline_p(LiNe):
+    Line=LiNe.strip()
+    if ' ' in Line or '\t' in Line:
+        return False
+    elif ',' not in Line:
+        return False
+    else:
+        LineEls=Line.split(',')
+        if len(LineEls)<5:
+            return False
+        elif any(not re.sub(r'^-','',LineEl).isdigit() for LineEl in LineEls[1:4]):
+            return False
+        else:
+            return True
+
+def valid_corpusline_p(LiNe):
+    Line=LiNe.strip()
+    if Line=='EOS':
+        return True
+    elif ' ' in Line or '\t' not in Line:
+        return False
+    elif len(Line.split('\t')[1].split(','))<=2:
+        return False
+    else:
+        return True    
+    
+def decompose_mecabline(Line,DicOrCorpus='corpus'):
+    assert DicOrCorpus=='dic' or DicOrCorpus=='corpus'
+    Line=Line.strip()
+    if DicOrCorpus=='corpus':
+        Orth,Rest=Line.strip().split('\t')
+        Fts=Rest.split(',')
+        Costs=None
+    else:
+        LineEls=Line.split(',')
+        Orth=LineEls[0]
+        Costs=tuple(LineEls[1:4])
+        Fts=LineEls[4:]
+    return (Orth,tuple(Fts),Costs)
 
 def simpletranslate_resources(SrcRes,SrcType,SrcFts,TgtDics,TgtType,TgtFts,IdentityAtts={'orth','cat','infform'}):
     SrcFtSet,TgtFtSet=set(SrcFts),set(TgtFts)
@@ -492,41 +768,52 @@ def fts2inds(Fts,CorpusOrDic='dic'):
         
     return sorted([Ind for (Ind,Ft) in Mapping.items() if Ft in Fts])
 
+def add_costs(IndsFtsOrFts):
+    ToAdd=[(1,'right'),(2,'left'),(3,'cost')]
+    if type(IndsFtsOrFts).__name__=='dict':
+        NewDic={}
+        for (Ind,Val) in IndsFtsOrFts.items():
+            NewInd=Ind if Ind==0 else Ind+3
+            NewDic[NewInd]=Val
+        NewDic.update(ToAdd)
+        return NewDic
+    elif type(IndsFtsOrFts).__name__=='list':
+        CopyList=copy.copy(IndsFtsOrFts)
+        CopyList=CopyList[:1]+[AddPair[1] for AddPair in ToAdd]+CopyList[2:]
+        return CopyList
+    else:
+        sys.stderr.write('Fts must be either list or dic\n')
+        return None
 
-
-def pick_feats_fromline(Line,RelvFtNames,Fts=None,DicOrCorpus='corpus',CorpusOrDic='corpus',Debug=False):
+def pick_feats_fromline(Line,TgtFtNames,InhFtNames=None,DicOrCorpus='corpus',ValueOnlyP=False,Debug=False):
+    assert (DicOrCorpus=='dic' or DicOrCorpus=='corpus')
     from bidict import bidict
     if not Line.strip():
         print('empty line encountered')
         return None
-    if Fts:
-        IndsFts=bidict({Ind:Ft for (Ind,Ft) in enumerate(Fts)})
-    else:
-        IndsFts=DefIndsFts if CorpusOrDic=='corpus' else DefLexIndsFts
-        IndsFts=bidict(IndsFts)
+    InhFtIndsNames={Ind:Ft for (Ind,Ft) in enumerate(InhFtNames)} if InhFtNames else DefIndsFts
+    FullIndsFts=InhFtIndsNames if DicOrCorpus=='corpus' else add_costs(InhFtIndsNames)
+    FullIndsFts=bidict(FullIndsFts)
+
     Line=Line.rstrip()
     if Line.startswith(','):
         Line=Line.replace(',','、',1)
     LineEls=Line.replace('\t',',').split(',')
-    if DicOrCorpus=='dic':
-        LineEls=LineEls[:1]+LineEls[4:]
-    FtCnt=len(LineEls)
-    if Fts is None:
-        Fts=DefFts
-        if Debug:
-            sys.stderr.write('we use the default feature set'+'\n')
-            sys.stderr.write(repr(Fts)+'\n')
-            sys.stderr.write('this may not correspond to the input, in which case you will get an assertion error'+'\n')
-    assert(FtCnt==len(Fts) or FtCnt==len(Fts)-2)
-    FtCntInLine=len(LineEls)
-    RelvInds=[ IndsFts.inv[FtName] for FtName in Fts if FtName in RelvFtNames ]
-    #RelvInds=fts2inds(RelvFtNames,Fts,CorpusOrDic=CorpusOrDic)
+    LineElCnt=len(LineEls)
+    LineInhFtEls=LineEls[:1]+LineEls[4:] if DicOrCorpus=='dic' else LineEls
+    LineInhFtCnt=len(LineInhFtEls)
+    #checking line has the specified number of feats and costs
+    assert(LineInhFtCnt==len(InhFtNames) and len(LineEls)==len(FullIndsFts))
+
+    TgtInds=[ Ind for (Ind,FtName) in FullIndsFts.items() if FtName in TgtFtNames ]
+
     Pairs=[]
-    for Ind in RelvInds:
-        if Ind+1>FtCntInLine:
-            break
-        Pairs.append((IndsFts[Ind],LineEls[Ind]))
-    return Pairs
+    for Ind in TgtInds:
+        Pairs.append((FullIndsFts[Ind],LineEls[Ind]))
+    if not ValueOnlyP:
+        return Pairs
+    else:
+        return tuple([Pair[1] for Pair in Pairs])
 
 def file2delimchunks(FP,Delim):
     FSr=open(FP)
@@ -627,7 +914,7 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('cat','orth','infform')):
+    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
         super().__init__(AVPairs)
         self.inherentatts=InhAtts
         self.identityatts=IdentityAtts
@@ -645,14 +932,18 @@ class MecabWdParse(WordParse):
     def replace_inherentatts(self,NewInhAtts):
         if type(NewInhAtts).__name__!='tuple':
             sys.exit('new inh atts need to be a tuple')
-        NewAtts=[NewInhAtt for NewInhAtt in self.inherentatts if NewInhAtt not in NewInhAtts]
+        for Att in self.inherentatts:
+            if Att not in NewInhAtts:
+                delattr(self,Att)
+        self.inherentatts=NewInhAtts
+#        NewAtts=[NewInhAtt for NewInhAtt in self.inherentatts if NewInhAtt not in NewInhAtts]
 #        if NewAtts:
  #           sys.stderr.write('[WARNING] new inhatt, '+repr(NewAtts))
-        self.inherentatts=NewInhAtts
-    def change_feats(self,AttsVals):
-        super().change_feats(AttsVals)
-        self.identityatts=('cat','orth','infform')
-        self.identityattsvals=self.get_identityattsvals()
+ 
+
+        
+        
+
     def get_identityattsvals(self):     
         return {K:self.__dict__[K] for K in self.identityatts}
     def same_type(self,AnotherWd):
@@ -1002,37 +1293,22 @@ class MecabWdParse(WordParse):
         for FtName,Val in self.__dict__.items():
             print(FtName,Val)
     def get_mecabline(self,CorpusOrDic='corpus'):
-        if CorpusOrDic=='dic':
-            return self.get_mecabdicline()
-        
-        Orth=self.orth
-        #self.inherentatts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform')
         FtStrs=[]
-        for Ft in self.inherentatts[1:]:
-            Val=self.__dict__[Ft]
-            FtStr='*' if Val is None else str(Val) 
+        for Ft in self.inherentatts:
+            FtStr='*' if not self.__dict__[Ft] else str(self.__dict__[Ft]) 
             FtStrs.append(FtStr)
-        FtStr=','.join(FtStrs)
-#            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
- #           FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
-  #          Rest=','.join(FtsNonEmpty)
-   #         Str=Str+'\t'+Rest
-        return '\t'.join([Orth,FtStr])
-    def get_mecabdicline(self):
-        Str=''
-        Orth=self.orth
-        if Orth:
-            Str=Orth
-            Fts=[self.cat,self.subcat,self.subcat2,self.sem,self.infpat,self.infform,self.lemma,self.reading,self.pronunciation]
-            FtsNonEmpty=[ Ft for Ft in Fts if Ft ]
-            Rest=','.join(FtsNonEmpty)
+        Orth=FtStrs[0]
+        Rest=FtStrs[1:]
+        if CorpusOrDic=='dic':
             if not self.costs:
-                Str=Str+',0,0,0,'+Rest
+                Costs=['0','0','0']
             else:
-                Str+=','+','.join([str(Cost) for Cost in self.costs])+','+Rest
-        return Str
+                Costs=[str(Cost) for Cost in self.costs]
+            FinalStr=','.join([Orth]+Costs+Rest)
+        else:
+            FinalStr=Orth+'\t'+','.join(Rest)
 
-
+        return FinalStr
 
 def reorder_dict(Dict,OrderedKeys):
     if any(OrderedKey not in Dict.keys() for OrderedKey in OrderedKeys):

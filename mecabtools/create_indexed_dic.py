@@ -3,7 +3,7 @@ import mecabtools
 imp.reload(mecabtools)
 
 def main0(Dir):
-    mecabtools.create_indexed_dic(Dir)
+    mecabtools.create_alph_objdics(Dir)
 
 def main():
     DicDir=sys.argv[1]
