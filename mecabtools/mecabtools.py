@@ -1,4 +1,4 @@
-import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict,glob
+import re, imp, os, sys, time, shutil,subprocess,collections, copy,glob
 from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
@@ -38,60 +38,7 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
-class Tree:
-    def __init__(self,CompPaths):
-        self.comppaths=CompPaths
 
-    def is_path(self,PathCand):
-        if not type(PathCand).__name__=='list':
-            return False
-        if not PathCand[0][0] is None:
-            return False
-        if not all((type(Node).__name__=='tuple') for Node in PathCand):
-            return False
-        return True
-    
-    def complete_path_p(self,Path):
-        return Path[-1][-1] is None
-
-    def next_nodes(self,CurNode):
-        NextNodes=[]
-        for Node in self.nodes:
-            if CurNode[1]==Node[0]:
-                NextNodes.append(Node)
-        return NextNodes
-    def classify_paths(self,Paths):
-        Complete=[];Int=[]
-        for Path in Paths:
-            if self.complete_path_p(Path):
-                Complete.append(Path)
-            else:
-                Int.append(Path)
-        return Complete, Int
-
-    def create_paths(self):
-        def extend_path(Path):
-            NextNodes=self.next_nodes(Path[-1])
-            NewPaths=[Path+[NextNode] for NextNode in NextNodes]
-            assert(all(self.is_path(NewPath) for NewPath in NewPaths))
-            return NewPaths
-
-        def extend_multipaths(Paths):
-            NewPaths=[]
-            for Path in Paths:
-                NewPaths.extend(extend_path(Path))
-            return NewPaths
-        
-        #(IntPaths,CompPaths)=next_nodes(self.startnodes)
-        IntPaths=[ [Node] for Node in self.startnodes ]
-        CompPaths=[]
-        Fst=True
-        while IntPaths:
-            NewPaths=extend_multipaths(IntPaths)
-            NewCompPaths,IntPaths=self.classify_paths(NewPaths)
-            CompPaths.extend(NewCompPaths)
-
-        return CompPaths
             
 def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
     DiffEls=PrvDiffDic
@@ -298,7 +245,7 @@ def construct_tree_from_file(FP):
 #            print(FullPaths)
             PrvLevel=Level
             
-    return Tree(FullPaths)
+    return myModule.Tree(FullPaths)
 
 MecabCatFN='mecabipa_cats.txt'
 CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')

@@ -4,6 +4,69 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+class Tree:
+    def __init__(self,Pairs,StartNodes=None):
+        #assert(all(len(Pair)==2 for Pair in Pairs))
+        self.edges=Pairs
+        PriorNodes=[Edge[0] for Edge in self.edges]
+        StartNodes=PriorNodes if StartNodes is None else StartNodes
+        StartEdges=[Edge for Edge in self.edges if Edge[1] not in StartNodes]
+        if not StartEdges:
+            sys.exit('startedges have to be nonempty')
+        self.startnodes=StartNodes
+        self.startedges=StartEdges
+
+    def is_path(self,PathCand):
+        if not type(PathCand).__name__=='list':
+            return False
+        if not PathCand[0][0] is None:
+            return False
+        if not all((type(Node).__name__=='tuple') for Node in PathCand):
+            return False
+        return True
+    
+    def complete_path_p(self,Path):
+        return Path[-1][-1] is None
+
+    def next_nodes(self,CurNode):
+        NextNodes=[]
+        for Node in self.nodes:
+            if CurNode[1]==Node[0]:
+                NextNodes.append(Node)
+        return NextNodes
+    def classify_paths(self,Paths):
+        Complete=[];Int=[]
+        for Path in Paths:
+            if self.complete_path_p(Path):
+                Complete.append(Path)
+            else:
+                Int.append(Path)
+        return Complete, Int
+
+    def create_paths(self):
+        def extend_path(Path):
+            NextNodes=self.next_nodes(Path[-1])
+            NewPaths=[Path+[NextNode] for NextNode in NextNodes]
+            assert(all(self.is_path(NewPath) for NewPath in NewPaths))
+            return NewPaths
+
+        def extend_multipaths(Paths):
+            NewPaths=[]
+            for Path in Paths:
+                NewPaths.extend(extend_path(Path))
+            return NewPaths
+        
+        #(IntPaths,Edges)=next_nodes(self.startnodes)
+        IntPaths=[ [Node] for Node in self.startnodes ]
+        CompPaths=[]
+        Fst=True
+        while IntPaths:
+            NewPaths=extend_multipaths(IntPaths)
+            NewCompPaths,IntPaths=self.classify_paths(NewPaths)
+            CompPaths.extend(NewCompPaths)
+
+        return CompPaths
+
 def rm_dir_content(Dir,Glob='*'):
     Files=os.path.join(Dir,Glob)
     for File in Files:
