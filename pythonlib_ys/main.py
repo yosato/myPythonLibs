@@ -5,35 +5,39 @@ from collections import abc as abc
 from pdb import set_trace
 
 class Tree:
-    def __init__(self,Pairs,StartNodes=None):
-        #assert(all(len(Pair)==2 for Pair in Pairs))
-        self.edges=Pairs
-        PriorNodes=[Edge[0] for Edge in self.edges]
-        StartNodes=PriorNodes if StartNodes is None else StartNodes
-        StartEdges=[Edge for Edge in self.edges if Edge[1] not in StartNodes]
+    def __init__(self,Pairs,StartNodes=None,FinalNodes=None):
+        assert(all(len(Pair)==2 for Pair in Pairs))
+        #self.edges=Pairs
+        PriorNodes=[Edge[0] for Edge in Pairs]
+        DstNodes=[Edge[1] for Edge in Pairs]
+        StartNodes=set([PriorNode for PriorNode in PriorNodes if PriorNode not in DstNodes]) if StartNodes is None else set(StartNodes)
+        StartEdges={(None,StartNode) for StartNode in StartNodes}
+        TerminalNodes={DstNode for DstNode in DstNodes if DstNode not in PriorNodes}
+        TerminalEdges={(TerminalNode,None) for TerminalNode in TerminalNodes}
         if not StartEdges:
             sys.exit('startedges have to be nonempty')
-        self.startnodes=StartNodes
         self.startedges=StartEdges
+        self.startnodes=StartNodes
+        self.edges=StartEdges.union(set(Pairs)).union(TerminalEdges)
 
     def is_path(self,PathCand):
         if not type(PathCand).__name__=='list':
             return False
         if not PathCand[0][0] is None:
             return False
-        if not all((type(Node).__name__=='tuple') for Node in PathCand):
+        if not all((type(Edge).__name__=='tuple') for Edge in PathCand):
             return False
         return True
     
     def complete_path_p(self,Path):
         return Path[-1][-1] is None
 
-    def next_nodes(self,CurNode):
-        NextNodes=[]
-        for Node in self.nodes:
-            if CurNode[1]==Node[0]:
-                NextNodes.append(Node)
-        return NextNodes
+    def next_edges(self,CurEdge):
+        NextEdges=[]
+        for Edge in self.edges:
+            if CurEdge[1]==Edge[0]:
+                NextEdges.append(Edge)
+        return NextEdges
     def classify_paths(self,Paths):
         Complete=[];Int=[]
         for Path in Paths:
@@ -43,11 +47,11 @@ class Tree:
                 Int.append(Path)
         return Complete, Int
 
-    def create_paths(self):
+    def create_paths(self,NoInitTerms=False):
         def extend_path(Path):
-            NextNodes=self.next_nodes(Path[-1])
-            NewPaths=[Path+[NextNode] for NextNode in NextNodes]
-            assert(all(self.is_path(NewPath) for NewPath in NewPaths))
+            NextEdges=self.next_edges(Path[-1])
+            NewPaths=[Path+[NextEdge] for NextEdge in NextEdges]
+            #assert(all(self.is_path(NewPath) for NewPath in NewPaths))
             return NewPaths
 
         def extend_multipaths(Paths):
@@ -56,16 +60,17 @@ class Tree:
                 NewPaths.extend(extend_path(Path))
             return NewPaths
         
-        #(IntPaths,Edges)=next_nodes(self.startnodes)
-        IntPaths=[ [Node] for Node in self.startnodes ]
-        CompPaths=[]
+        #(IntPaths,Edges)=next_edges(self.startedges)
+        IntPaths=[ [Edge] for Edge in self.startedges ]
+        CompletePaths=[]
         Fst=True
         while IntPaths:
             NewPaths=extend_multipaths(IntPaths)
-            NewCompPaths,IntPaths=self.classify_paths(NewPaths)
-            CompPaths.extend(NewCompPaths)
-
-        return CompPaths
+            NewCompletePaths,IntPaths=self.classify_paths(NewPaths)
+            CompletePaths.extend(NewCompletePaths)
+        if NoInitTerms:
+            CompletePaths=[CompletePath[1:-1] for CompletePath in CompletePaths]
+        return CompletePaths
 
 def rm_dir_content(Dir,Glob='*'):
     Files=os.path.join(Dir,Glob)
