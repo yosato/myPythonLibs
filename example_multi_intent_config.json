@@ -1,0 +1,55 @@
+{ "pairs": [
+    [ "nav_def_loc", "localsearch_no_loc", 100 ],
+    [ "weather", "news", 100 ],
+    [ "weather",  "nav_def_loc", 100 ],
+    [ "weather", "news", "nav_def_loc", 100 ]
+   ],
+  "signature_groups": {
+    "nav_def_loc": [
+        "auto_only_nav_def__locality",
+        "auto_only_nav_def__locality__name",
+        "auto_only_nav_def__cat__locality"
+     ],
+    "news": [
+        "news_def__newsphrase",
+        "news_def__newsphrase__voice"
+     ],
+    "weather": [
+        "weather_lookup",
+        "weather_lookup__date",
+        "weather_lookup__time"
+     ],
+    "localsearch_no_loc": [
+        "auto_only_localsearch_def__name",
+        "auto_only_localsearch_def__cat",
+        "auto_only_localsearch_def__locref__name",
+        "auto_only_localsearch_def__cat__locref",
+        "auto_only_localsearch_def__cat__price"
+     ]
+   },
+
+
+  "multi_intent_regtests_dir": "$RESOURCES/en-US/NCS5.1/CTagger/data/multi_intent_regtests" ,
+
+  "joiner_phrases": [ " and|<unk> ", " and|<unk> then|<unk> " ],
+
+  "source_data": {
+      "train": {
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/convertedtrn/BMW_35UP_FY16Q3.training.final.weightedfieldannotatedstring": 5,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/convertedtrn/BMW_35UP_Phase2_FY17Q1_Dec.training.final.weightedfieldannotatedstring": 1,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/convertedtrn/BMW_35UP_Phase2_FY17Q1_Nov.training.final.weightedfieldannotatedstring": 10
+      },
+    "multi_intent_dev": {
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/publishedtst/BMW_35UP_dev.testing.final.weightedfieldannotatedstring": 5,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/publishedtst/BMW_35UP_FY16Q3_dev.testing.final.weightedfieldannotatedstring": 20,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/publishedtst/svoice_FY14Q4_random_dev.testing.final.weightedfieldannotatedstring": 1
+    },
+    "multi_intent_blind": {
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/publishedtst/Audi_Altran_NLUA1534_dev.en-GB.testing.final.weightedfieldannotatedstring": 5,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/publishedtst/BMW_35UP_blind.testing.final.weightedfieldannotatedstring": 5,
+        "$TAGGING_DATA_HOME/midasTrainTest/en-US.NCS5.1/convertedtst/coverage-tests.final.weightedfieldannotatedstring": 1 
+    }
+  },
+
+  "app_spec": "$RESOURCES/common-lang/NCS5.1/CTagger/config/tagging-specs/app_spec.json"
+}

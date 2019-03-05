@@ -4,6 +4,7 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+
 class Tree:
     def __init__(self,Pairs,StartNodes=None,FinalNodes=None):
         assert(all(len(Pair)==2 for Pair in Pairs))
@@ -71,6 +72,10 @@ class Tree:
         if NoInitTerms:
             CompletePaths=[CompletePath[1:-1] for CompletePath in CompletePaths]
         return CompletePaths
+
+def allequal_p(iterator):
+   return len(set(iterator)) <= 1
+
 
 def rm_dir_content(Dir,Glob='*'):
     Files=os.path.join(Dir,Glob)
@@ -876,6 +881,9 @@ def progress_counter(Milestones,ProgressConsts,Current,Unit='',Interval=2):
             time.sleep(Interval)
     return Milestones
 
+def allequal_p(iterator):
+   return len(set(iterator)) <= 1
+
 def exist_paths_p(FPs):
     return check_exist_paths(FPs)
 
@@ -883,13 +891,15 @@ def warnprint(Str):
     print(return_stack())
     print(Str)
 
-def check_exist_paths(FPs):
-    Bool=True
+def check_exist_paths(FPs,DirLevelP=False):
     for FP in FPs:
-        if not os.path.exists(FP):
+        if  os.path.exists(FP):
+            Bool=True
+        else:
             warnprint(FP+' does not exist')
             if os.path.isdir(os.path.dirname(FP)):
                 print('... but the upper dir exists')
+                Bool=True if DirLevelP else False
             else:
                 print('... nor the upper dir')
                 Bool=False

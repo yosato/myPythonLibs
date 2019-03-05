@@ -1,4 +1,5 @@
 import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict,glob,datetime
+
 from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
@@ -38,9 +39,10 @@ InfCats=('動詞','形容詞','助動詞')
 IrregPats=('不変化型','サ変','カ変')
 DinasourPats=('ラ変','文語','四段','下二','上二')
 
-class Tree:
-    def __init__(self,CompPaths):
-        self.comppaths=CompPaths
+
+
+            
+def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
 
     def is_path(self,PathCand):
         if not type(PathCand).__name__=='list':
@@ -182,6 +184,7 @@ class Resource:
     
     
 def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,myResources,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
+>>>>>>> lineresstats
     DiffEls=PrvDiffDic
 #    ResFN=os.path.basename(ResFP)
     CorD=DicOrCorpus if DicOrCorpus is not None else dic_or_corpus(ResFP,FullCheckP=False)
@@ -535,7 +538,7 @@ def construct_tree_from_file(FP):
 #            print(FullPaths)
             PrvLevel=Level
             
-    return Tree(FullPaths)
+    return myModule.Tree(FullPaths)
 
 MecabCatFN='mecabipa_cats.txt'
 CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')
