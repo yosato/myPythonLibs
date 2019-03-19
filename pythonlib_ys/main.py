@@ -4,8 +4,10 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+
+
 class Tree:
-    def __init__(self,Pairs,StartNodes=None,FinalNodes=None):
+    def __init__(self,Pairs,StartNodes=None,Map=None,FinalNodes=None):
         assert(all(len(Pair)==2 for Pair in Pairs))
         #self.edges=Pairs
         PriorNodes=[Edge[0] for Edge in Pairs]
@@ -19,6 +21,7 @@ class Tree:
         self.startedges=StartEdges
         self.startnodes=StartNodes
         self.edges=StartEdges.union(set(Pairs)).union(TerminalEdges)
+        self.nodeamap=Map
 
     def is_path(self,PathCand):
         if not type(PathCand).__name__=='list':
