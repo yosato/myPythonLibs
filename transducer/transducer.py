@@ -144,7 +144,7 @@ def parse_with_transducer(Str,Trans,InfForm,VLexs,ReverseP=False,Debug=True):
         if NewSeg:
 #            NewStr=RemStr+NewSeg
             ConsumedStr=''.join(ConsumedStrs)
-            return NewSeg,ConsumedStr
+            return NewSeg,LstSeg,ConsumedStr
 
     else:
         return None
