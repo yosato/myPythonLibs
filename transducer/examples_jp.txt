@@ -1,2 +1,6 @@
-検索してください	検索し
-探せ	探し
+検索してください	検索し(renyo-onbin),検索すれ(katei)
+探せ	探し(renyo-onbin),探せ(katei)
+見つけてほしいな	見つけて(renyo-onbin),見つけれ(katei)
+	
+
+

@@ -5,21 +5,67 @@ from collections import abc as abc
 from pdb import set_trace
 
 
+def one_level_flatten(OrgList):
+    Flattened=[];List=copy.copy(OrgList)
+    for El in List:
+        if isinstance(El,list):
+            Flattened=Flattened+El
+    return Flattened
+
+def nestedlist2pairs(NestedList):
+    Pairs={(None,(0,0)):NestedList}
+    CurrentList=[copy.copy(NestedList)]
+    CurDepth=0
+    while True:
+     #   print(str(CurDepth)+' to '+str(CurDepth+1)+' starting')
+        PairsPerDepth=[]
+        WidthPerDepth=0;ListExistP=False;NextList=[]
+        for Width,El in enumerate(CurrentList):
+            #WidthPerDepth+=Width
+            if isinstance(El,list):
+                SubElsPerEl=[(((CurDepth,Width),(CurDepth+1,WidthPerDepth+SubWidth)),SubEl) for SubWidth,SubEl in enumerate(El)]
+                PairsPerDepth.extend(SubElsPerEl)
+                ListExistP=True
+                WidthPerDepth+=len(SubElsPerEl)
+            else:
+                # dont know why this was happening...
+                if El in Pairs.values():
+                    print(El)
+                else:
+                    WidthPerDepth+=1
+                    PairsPerDepth.append((((CurDepth,Width),(CurDepth+1,WidthPerDepth)),El))
+        Pairs.update(PairsPerDepth)
+
+        PrvPairsPerDepth=PairsPerDepth
+           
+        if not ListExistP:
+            return collections.OrderedDict(Pairs)
+        print(str(CurDepth)+' to '+str(CurDepth+1)+' done')
+        CurDepth+=1
+#        print(CurrentList)
+        CurrentList=one_level_flatten(CurrentList)
+ #       print(CurrentList)
+
+
 class Tree:
-    def __init__(self,Pairs,StartNodes=None,FinalNodes=None):
+    def __init__(self,Pairs,StartNodes=None,Map=None,FinalNodes=None):
         assert(all(len(Pair)==2 for Pair in Pairs))
         #self.edges=Pairs
-        PriorNodes=[Edge[0] for Edge in Pairs]
+        self.priornodes=[Edge[0] for Edge in Pairs]
         DstNodes=[Edge[1] for Edge in Pairs]
-        StartNodes=set([PriorNode for PriorNode in PriorNodes if PriorNode not in DstNodes]) if StartNodes is None else set(StartNodes)
+        StartNodes=set([PriorNode for PriorNode in self.priornodes if PriorNode not in DstNodes]) if StartNodes is None else set(StartNodes)
         StartEdges={(None,StartNode) for StartNode in StartNodes}
-        TerminalNodes={DstNode for DstNode in DstNodes if DstNode not in PriorNodes}
+        TerminalNodes={DstNode for DstNode in DstNodes if DstNode not in self.priornodes}
         TerminalEdges={(TerminalNode,None) for TerminalNode in TerminalNodes}
         if not StartEdges:
             sys.exit('startedges have to be nonempty')
         self.startedges=StartEdges
         self.startnodes=StartNodes
         self.edges=StartEdges.union(set(Pairs)).union(TerminalEdges)
+        self.nodeamap=Map
+
+    def get_children(self,Node):
+        return [Edge[-1] for Edge in self.edges if Edge[0]==Node]
 
     def is_path(self,PathCand):
         if not type(PathCand).__name__=='list':
