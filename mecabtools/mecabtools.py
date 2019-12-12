@@ -1578,8 +1578,8 @@ def mecabfile2mecabsents(MecabFP):
 def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
     WithCost=False if CorpusOrDic=='corpus' else WithCost
-    FtsVals,Costs=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
-    return MecabWdParse(dict(FtsVals),Costs=Costs)
+    FtsVals=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
+    return MecabWdParse(dict(FtsVals),Costs=None)
 
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
