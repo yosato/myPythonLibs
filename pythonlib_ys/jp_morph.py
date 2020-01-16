@@ -16,6 +16,30 @@ for CharSet,Relatives in CharSetsWithRelatives.items():
         CharsWithRelatives[Char]=tuple(Relative)
         VoicedHalfVoiced.extend(Relative)
 
+def preserved_order_sublist_p(ShorterList,LongerList):
+    LongerListCopy=copy.copy(LongerList)
+    for El in ShorterList:
+        if El not in LongerListCopy:
+            return False
+        else:
+            LongerListCopy=LongerList[LongerListCopy.index(El):]
+    return True
+        
+def okurigana_variants_p(Str1,Str2):
+    # if no kanji is involved at all, leave it
+    if not any(myModule.at_least_one_of_chartypes_p(Str,['han']) for Str in (Str1,Str2)):
+        return False
+    # the kanji content (including the order) is identical between the two
+    Kanjis1,Kanjis2=[[myModule.identify_chartype(Char) for Chars in Str] for Str in (Str1,Str2)]
+    if Kanjis1!=Kanjis2:
+        return False
+    # shorter one is preserved-order char subset of longer one
+    (Longer,Shorter)=(Str1,Str2) if Str1>Str2 else (Str2,Str1)
+    if not preserved_order_sublist_p(Shorter,Longer):
+        return False
+    return True
+    
+        
 def unvoice_char(Char,StrictP=False):
     CharType=myModule.identify_chartype(Char)
     assert(CharType in ['hiragana','katakana'])

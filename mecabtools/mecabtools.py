@@ -2,9 +2,11 @@ import re, imp, os, sys, time, shutil,subprocess,collections, copy,bidict,glob,d
 from difflib import SequenceMatcher
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
+
+
 import romkan
 from pythonlib_ys import jp_morph
-import correspondences
+from . import correspondences
 imp.reload(myModule)
 imp.reload(jp_morph)
 imp.reload(correspondences)
@@ -180,7 +182,48 @@ class Resource:
         self.restype=ResType
 
     
-    
+def collect_wdobjs_with_freqs(MecabCorpusFPs,TagType='ipa',StrictP=True):
+    HomsProto={}#=defaultdict(dict)
+    NonParseables=defaultdict(int)
+    MemoiseTable=dict()
+    FileCnt=len(MecabCorpusFPs)
+    for Cntr,FP in enumerate(MecabCorpusFPs):
+        if Cntr+1%20==0:
+            sys.stderr.write('File '+str(Cntr+1)+' of '+str(FileCnt)+'\n')
+        with open(FP,errors='replace') as FSr:
+            for LiNe in FSr:
+                Line=LiNe.strip()
+                if Line=='EOS':
+                    continue
+                elif Line in NonParseables:
+                    continue
+                
+                OrthFtStr=Line.split('\t')
+                if len(OrthFtStr)!=2:
+                    continue
+                else:
+                    FtEls=OrthFtStr[1].split(',')
+                    if '記号' in FtEls[0]:
+                        continue
+                    assert (TagType=='ipa' and len(FtEls)==9 or len(FtEls)==7) or (TagType=='kokugoken' and len(FtEls)==7)
+                Fts=['orth','cat','subcat','sem','infform','infpat','lemma','pronunciation'] if TagType=='kokugoken' else None
+                WdFtsVals=line2wdfts(LiNe,'corpus',Fts=Fts)
+                WdVals=tuple(WdFtsVals.values())
+                if WdVals not in MemoiseTable:
+                    try:
+                        Wd=MecabWdParse(WdFtsVals)
+                    except:
+                    #    MecabWdParse(WdFtsVals)
+                        NonParseables[LiNe.strip()]+=1
+                    MemoiseTable[WdVals]=Wd
+                    HomsProto[Wd]=1
+                else:
+                    HomsProto[MemoiseTable[WdVals]]+=1
+        if StrictP and sum(NonParseables.values())>len(HomsProto)*.1:
+            sys.stderr.write('Too many unparsables, we are returning them insteads\n\n')
+            return NonParseables
+    return HomsProto
+
 def extract_diffs_withinresource(ResFP,EssFtNames,OrderedFtNames,myResources,PrvDiffDic={},Debug=False,DicOrCorpus=None,ResLineCnt=None):
     DiffEls=PrvDiffDic
 #    ResFN=os.path.basename(ResFP)
@@ -1161,12 +1204,31 @@ class WordParse(Word):
 
 class MecabWdParse(WordParse):        
     def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
+        if 'pronunciation' not in AVPairs:
+            if  myModule.all_of_chartypes_p(AVPairs['orth'],['hiragana','katakana']):
+                Reading=jp_morph.render_kana(AVPairs['orth'],WhichKana='katakana')
+                AVPairs['reading']=Reading
+                AVPairs['pronunciation']=Reading
+            else:
+                AVPairs['reading']='*'
+                AVPairs['pronunciation']='*'
         super().__init__(AVPairs)
         self.inherentatts=InhAtts
         self.identityatts=IdentityAtts
         self.identityattsvals=self.get_identityattsvals()
         if self.cat=='動詞' or self.cat=='形容詞':
-            self.divide_stem_suffix()
+            Ret=self.divide_stem_suffix()
+            if Ret is not None:
+                (Stem,StemPron),(Suffix,LemmaSuffix)=Ret
+                self.stem=Stem
+                self.stempron=StemPron
+                self.suffix=Suffix
+                self.lemmasuffix=LemmaSuffix
+            else:
+                self.stem='unk'
+                self.stempron='unk'
+                self.suffix='unk'
+                self.lemmasuffix='unk'
          
         self.soundrules=[]; self.variants=[]
         self.count=None
@@ -1212,7 +1274,23 @@ class MecabWdParse(WordParse):
                 return not DefBool
         return DefBool
 
-    def divide_stem_suffix_radical(self,OutputObject=True,StrictP=False):
+
+    def amalgamate_stem_suffix(self,Stem,Suffix):
+        if Stem and ord(Stem[-1])<=127:
+            if Suffix[0]=='t':
+                Middle='っ'
+            elif Stem[-1]=='w' and Suffix=='u':
+                Middle='う'
+            else:
+                Middle=romkan.to_hiragana(Stem[-1]+Suffix)
+            return Stem[:-1]+Middle
+        else:
+            return Stem+Suffix
+        
+    def derive_lemma_pronunciation(self):
+        return jp_morph.render_kana(self.amalgamate_stem_suffix(self.stempron,self.lemmasuffix),WhichKana='katakana')
+    
+    def divide_stem_suffix(self,OutputObject=False,StrictP=False,OrthPron=['orth']):
         IrregTable= {
             'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい','未然形・長音化':'eえ','未然形・長音化i':'iい','基本形・撥音便':'uん','未然形・ヤ挿入':'iや'}),
             'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい','基本形・撥音便':'uん','未然形・長音化':'eえ','未然形・長音化o':'oお','未然形・長音化i':'iい','未然形・ヤ挿入':'iや'}),
@@ -1232,7 +1310,7 @@ class MecabWdParse(WordParse):
                 InfType='fixed'
                 InfGyo=None
 
-            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
+            elif (self.cat=='形容詞' and '文語' not in self.infpat) or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
                 InfType='adj'
                 InfGyo=None
             elif Pats:
@@ -1252,6 +1330,9 @@ class MecabWdParse(WordParse):
         
         def handle_irregulars(self,Type):
             Stem,Suffixes=IrregTable[Type]
+            if Type=='サ変' and self.lemma!='する':
+                SuperStem=self.lemma[:-2]
+                Stem=SuperStem+Stem
             if self.infform not in Suffixes.keys():
                 print('\n'+self.infform+' not found for '+Type+'\n')
                 Suffix=None
@@ -1268,7 +1349,7 @@ class MecabWdParse(WordParse):
             Suffix=''
         elif InfType is None and not StrictP:
             print('\nCategorisation of\n'+repr(self.__dict__)+'\nfailed\n')
-            return self
+            return None
         
         elif InfType=='adj':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ','けりゃ')
@@ -1312,15 +1393,12 @@ class MecabWdParse(WordParse):
             sys.stderr.write('\nERROR for'+self.get_mecabline()+'\n')
             sys.exit('ERROR: no category to classify, aborting\n')
         
-        self.stem=Stem
-        self.suffix=Suffix
-
         if not Suffix:
             StemReading=self.reading
         else:
-            StemReading=self.reading[:-len(self.suffix)]
-            if re.match(r'^.*[a-z]$',self.stem):
-                StemReading=StemReading+self.stem[-1]
+            StemReading=self.reading[:-len(Suffix)]
+            if re.match(r'^.*[a-z]$',Stem):
+                StemReading=StemReading+Stem[-1]
         if OutputObject:
             Stem=self.get_variant([('orth',Stem),('infform','語幹'),('reading',StemReading),('pronunciation',StemReading)])
             
@@ -1328,8 +1406,22 @@ class MecabWdParse(WordParse):
         if OutputObject:
             KatakanaSuffix=romkan.to_katakana(Suffix)
             Suffix=self.get_prototype(FtsVals=[('orth',Suffix),('lemma',Suffix), ('infform',self.infform), ('cat','活用語尾'), ('pronunciation',KatakanaSuffix)])
+
+        Infl=Stem[-1]  if Stem and ord(Stem[-1])<=127 else ''
+                
+        StemPron=self.pronunciation[:len(self.pronunciation)-len(Suffix)]+Infl
         
-        return Stem,Suffix
+        RenderRomanP=True if myModule.identify_chartype(Stem[0])=='roman' else False
+            
+        SuffixLemma,SuffixStem=subtract_shared_substring(self.lemma,Stem,RenderRomanP=RenderRomanP)
+        if len(SuffixLemma)>=2 and all(ord(Char)<=127 for Char in SuffixLemma[-2:]):
+            SuffixLemma=SuffixLemma[:-2]+romkan.to_hiragana(SuffixLemma[-2:])
+        if SuffixStem and ord(SuffixStem[0])<=127:
+            SuffixLemmaRoman=romkan.to_roma(SuffixLemma)
+            SuffixLemma,_B=subtract_shared_substring(SuffixLemmaRoman,SuffixStem)
+            
+        return (Stem,StemPron),(Suffix,SuffixLemma)
+    
     def populated_catfeats(self):
         PopulatedCatFeats=[self.cat]
         for Feat in (self.subcat,self.subcat2,self.sem):
@@ -1337,37 +1429,7 @@ class MecabWdParse(WordParse):
                 PopulatedCatFeats.append(Feat)
         return tuple(PopulatedCatFeats)
     
-    def divide_stem_suffix(self):
-        if self.cat=='動詞':
-            if self.infpat=='一段':
-                if any(Pat in self.infform for Pat in ('未然','連用','命令')):
-                    Stem=self.orth[:-1]
-                    Suffix=self.orth[-1]
-                else:
-                    Stem=self.orth[:-2]
-                    Suffix=self.orth[-2:]
-            else:
-                Stem=self.orth[:-1]
-                Suffix=self.orth[-1]
-        elif self.cat=='形容詞':
-            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','けりゃ','し')
-            WhichEnding=[ Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) ]
-            if WhichEnding:
-                Ending=WhichEnding[0]
-                BoundInd=-len(Ending)
-                BoundIndAlt=BoundInd-1
-                if len(self.orth)> -(BoundIndAlt):
-                    PrvChar=self.orth[BoundIndAlt]
-                    if PrvChar in ('し','た','ぽ'):
-                        BoundInd=BoundIndAlt
-                Stem=self.orth[:BoundInd]
-                Suffix=self.orth[BoundInd:]
-            else:
-                Stem=self.orth[:-1]
-                Suffix=self.orth[-1:]
-        self.stem=Stem
-        self.suffix=Suffix
-        return Stem,Suffix
+
                 
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
@@ -1414,8 +1476,8 @@ class MecabWdParse(WordParse):
 
     def get_prototype(self,FtsVals={}):
         FtsVals=dict(FtsVals)
-        AVPairs=[(Att,'*') for Att in self.inherentatts]
-        ProtoType=MecabWdParse(*AVPairs)
+        AVPairs={Att:'*' for Att in self.inherentatts}
+        ProtoType=MecabWdParse(AVPairs)
         for Ft,Val in FtsVals.items():
             ProtoType.__dict__[Ft]=Val
         return ProtoType
@@ -2064,3 +2126,16 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
     return Bool
 
 
+def subtract_shared_substring(Str1,Str2,RenderRomanP=False,BackwardP=False):
+    if RenderRomanP:
+        Str1,Str2=[jp_morph.render_kana(Str) if myModule.at_least_one_of_chartypes_p(Str,['han']) else Str for Str in (Str1,Str2)]
+        Str1,Str2=[romkan.to_roma(Str) for Str in (Str1,Str2)]
+    NewStr1,NewStr2=[Str if not BackwardP else Str[::-1] for Str in (Str1,Str2)]
+    for (Char1,Char2) in zip(Str1,Str2):
+        if Char1==Char2:
+            NewStr2=NewStr2[1:];NewStr1=NewStr1[1:]
+        else:
+            break
+    NewStr1,NewStr2=[Str if not BackwardP else Str[::-1] for Str in (NewStr1,NewStr2)]
+    
+    return NewStr1,NewStr2

@@ -149,6 +149,7 @@ def merge_tuples_withindex(Tuples):
 def merge_filenames(FNs,UpperBound=5):
     assert all('/' not in FN for FN in FNs), 'you need a filename, not path'
     Stems,Exts=merge_tuples_withindex([get_stem_ext(FN) for FN in FNs])
+    Stems=sorted(Stems)
     Ext=Exts[0] if all(Ext==Exts[0] for Ext in Exts[1:]) else '.'.join(Exts)
         
     StemStrs=[]
