@@ -4,6 +4,27 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+def chain_partition(ListOrg,relation,IndsOnly=False):
+    Partitions=set()
+    List=copy.copy(list(enumerate(ListOrg)))
+    while List:
+        TgtEl=List[0]
+        Partition={TgtEl}
+        for El in List[1:]:
+            if relation(TgtEl[1],El[1]):
+                Partition.add(El)
+
+        Partitions.add(frozenset(Partition))
+        for ElInPart in Partition:
+            List.remove(ElInPart)
+    if IndsOnly:
+        RedPartitions=set()
+        for Part in Partitions:
+            RedPart=[Ind for (Ind,_) in Part]
+            RedPartitions.add(frozenset(RedPart))
+        Partitions=RedPartitions
+    return Partitions
+
 
 def one_level_flatten(OrgList):
     Flattened=[];List=copy.copy(OrgList)
