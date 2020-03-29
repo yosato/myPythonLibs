@@ -2,6 +2,7 @@ from heapq import heapify, heappop,heappush
 from itertools import islice, cycle
 from tempfile import gettempdir
 import os,sys
+from pdb import set_trace
 
 def merge(chunks,key=None):
     if key is None:
@@ -43,17 +44,25 @@ def batch_sort(input,output,key=None,buffer_size=32000,tempdirs=[]):
     if not tempdirs:
         tempdirs.append(gettempdir())
     
+    file_size=os.path.getsize(input)
+    batch_count=file_size/buffer_size
+    unit=batch_count/100;unit_increment=0
     input_file = open(input,'rb',64*1024)
+    
     try:
         input_iterator = iter(input_file)
         
         chunks = []
         try:
+#            set_trace()
             for cntr,tempdir in enumerate(cycle(tempdirs)):
-                #print(cntr)
+                if cntr!=0 and (cntr+1)%unit==0:
+                    unit_increment+=1
+                    sys.stderr.write(str(cntr)+' or '+str(unit_increment)+'% done\n')
                 current_chunk = list(islice(input_iterator,buffer_size))
                 if current_chunk:
                     current_chunk.sort(key=key)
+
                     output_chunk = open(os.path.join(tempdir,'%06i'%len(chunks)),'w+b',64*1024)
                     output_chunk.writelines(current_chunk)
                     output_chunk.flush()
@@ -62,6 +71,7 @@ def batch_sort(input,output,key=None,buffer_size=32000,tempdirs=[]):
                 else:
                     break
         except:
+            sys.stderr.write('sort failed, cleaning up...\n')
             for chunk in chunks:
                 try:
                     chunk.close()
@@ -77,7 +87,7 @@ def batch_sort(input,output,key=None,buffer_size=32000,tempdirs=[]):
             return
     finally:
         input_file.close()
-    
+    print('batch sort finished, now merging') 
     output_file = open(output,'wb',64*1024)
     try:
         output_file.writelines(merge(chunks,key))

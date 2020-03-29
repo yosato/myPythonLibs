@@ -2089,8 +2089,8 @@ def pop_chunk_from_stream(FSr,Pattern='\t',Type='delim',IncludeDelim=False,FstIg
             Cond2AccumF=(lambda Line,Pattern: (Line!='' and not re.match(r'%s'%Pattern,Line.strip()))) 
         elif Type=='cont':
             # you may have dots and things for continued pattern to use
+            Pattern=Line.split(Pattern)[0]+Pattern
             Pattern=escape_sp_chars(Pattern)
-            Pattern=Line.split(Pattern)[0]+'\t'
             Cond2AccumF=(lambda Line,Pattern: (Line!='' and re.match(r'^%s'%Pattern,Line.strip())))
 
         if FstIgnore and LineCnt==0:
