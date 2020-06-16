@@ -4,6 +4,42 @@ from collections import abc as abc
 
 from pdb import set_trace
 
+def sv2ftsvals(SVFP,Delim):
+    return sv2featsvals(SVFP,Delim)
+                
+def sv2featsvals(SVFP,Delim='\t',PropagatePrv=[]):
+    IndsFts={};LofFtsVals=[]
+    with open(SVFP) as FSr:
+        for Cnt,LiNe in enumerate(FSr):
+            Line=LiNe.strip('\n').strip(' ')
+            if not Line.strip('\t'):
+                continue
+            if Cnt==0:
+                Line=Line.replace(chr(int('0xfeff',16)),'')
+                for Ind,Feat in enumerate(Line.split(Delim)):
+                    IndsFts[Ind]=Feat
+                FtCnt=len(IndsFts)
+                print('there are '+str(FtCnt)+' features in this file, i.e. '+SVFP+' '+' '.join(IndsFts.values()))
+                time.sleep(0.5)
+            else:
+                LineEls=Line.split(Delim)
+                if len(LineEls)==FtCnt-1 or len(LineEls)==FtCnt:
+                    LofFtsVals.append({IndsFts[Ind]:El for (Ind,El) in enumerate(LineEls)})
+    return LofFtsVals
+
+def find_duplicates(List):
+    Seen={};Dups=collections.defaultdict(list)
+    for Ind,El in enumerate(List):
+        if El in Seen:
+            if El not in Dups:
+                Dups[El].extend([Seen[El],Ind])
+            else:
+                Dups[El].append(Ind)
+        Seen[El]=Ind
+    return Dups
+
+
+
 def chain_partition(ListOrg,relation,IndsOnly=False):
     Partitions=set()
     List=copy.copy(list(enumerate(ListOrg)))
