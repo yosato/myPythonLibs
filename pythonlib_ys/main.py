@@ -6,9 +6,29 @@ from pdb import set_trace
 
 def sv2ftsvals(SVFP,Delim):
     return sv2featsvals(SVFP,Delim)
-                
-def sv2featsvals(SVFP,Delim='\t',PropagatePrv=[]):
+
+def column_equality_check(FP,Delim,UpTo=2000):
+    IllegLines=[]
+    with open(FP) as FSr:
+        Cnt=len(FSr.readline().strip('\n').strip(' ').split(Delim))
+        for Ind,LiNe in enumerate(FSr):
+            LineEls=LiNe.strip('\n').strip(' ').split(Delim)
+            if len(LineEls)!=Cnt:
+                IllegLines.append((len(LineEls),LineEls))
+    return Cnt,IllegLines            
+            
+
+def sv2featsvals(SVFP,Delim='\t',PrvPropagateFts=[],PadP=True):
+    Cnt,IllegLines=column_equality_check(SVFP,Delim)
+    if IllegLines:
+        print(Cnt)
+        print(IllegLines)
+        if not PadP:
+            return None
+        else:
+            PadCnt=max([Cnt for (Cnt,_) in IllegLines])-Cnt
     IndsFts={};LofFtsVals=[]
+    PrvPropagateFtsVals={Ft:'' for Ft in PrvPropagateFts}
     with open(SVFP) as FSr:
         for Cnt,LiNe in enumerate(FSr):
             Line=LiNe.strip('\n').strip(' ')
@@ -20,11 +40,24 @@ def sv2featsvals(SVFP,Delim='\t',PropagatePrv=[]):
                     IndsFts[Ind]=Feat
                 FtCnt=len(IndsFts)
                 print('there are '+str(FtCnt)+' features in this file, i.e. '+SVFP+' '+' '.join(IndsFts.values()))
+                if PadP:
+                    for i in range(PadCnt):
+                        IndsFts[FtCnt+i]='additional_feat'+str(i+1)
                 time.sleep(0.5)
             else:
                 LineEls=Line.split(Delim)
-                if len(LineEls)==FtCnt-1 or len(LineEls)==FtCnt:
-                    LofFtsVals.append({IndsFts[Ind]:El for (Ind,El) in enumerate(LineEls)})
+                if not PadP:
+                    assert len(LineEls)==FtCnt-1 or len(LineEls)==FtCnt
+                FtsVals={IndsFts[Ind]:El.strip() for (Ind,El) in enumerate(LineEls)}
+                for Ft in PrvPropagateFts:
+                    if FtsVals[Ft]=='':
+                        FtsVals[Ft]=PrvPropagateFtsVals[Ft]
+                    else:
+                        PrvPropagateFtsVals[Ft]=FtsVals[Ft]
+                            
+                LofFtsVals.append(FtsVals)
+
+                
     return LofFtsVals
 
 def find_duplicates(List):
