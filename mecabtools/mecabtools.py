@@ -650,7 +650,7 @@ def sort_dic(DicFP,ColNum,OutFP=None,InLineP=False):
     os.remove(TmpOutFP)
 
  #   StartChar=dict(pick_feats_fromline(Line,['reading'],DicOrCorpus='dic'))['reading'][0][0]
-
+ 
 def deduplicate_list(seq):
     seen = set()
     seen_add = seen.add
@@ -1203,7 +1203,7 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
+    def __init__(self,AVPairs,Costs=None,Freq=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
         if 'pronunciation' not in AVPairs:
             if  myModule.all_of_chartypes_p(AVPairs['orth'],['hiragana','katakana']):
                 Reading=jp_morph.render_kana(AVPairs['orth'],WhichKana='katakana')
@@ -1236,6 +1236,7 @@ class MecabWdParse(WordParse):
         self.lexpos=None
         if 'infpat' in self.__dict__.keys():
             self.majorinfpat=self.infpat.split('・')[0] if self.infpat else self.infpat
+        self.freq=Freq
 
     def replace_inherentatts(self,NewInhAtts):
         if type(NewInhAtts).__name__!='tuple':
@@ -1411,7 +1412,7 @@ class MecabWdParse(WordParse):
                 
         StemPron=self.pronunciation[:len(self.pronunciation)-len(Suffix)]+Infl
         
-        RenderRomanP=True if myModule.identify_chartype(Stem[0])=='roman' else False
+        RenderRomanP=True if not Stem or myModule.identify_chartype(Stem[0])=='roman' else False
             
         SuffixLemma,SuffixStem=subtract_shared_substring(self.lemma,Stem,RenderRomanP=RenderRomanP)
         if len(SuffixLemma)>=2 and all(ord(Char)<=127 for Char in SuffixLemma[-2:]):
@@ -1637,11 +1638,11 @@ def mecabfile2mecabsents(MecabFP):
     
 
     
-def mecabline2mecabwd(MecabLine,CorpusOrDic,Fts=None,WithCost=True):
+def mecabline2mecabwd(MecabLine,CorpusOrDic,Freq=None,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
     WithCost=False if CorpusOrDic=='corpus' else WithCost
     FtsVals=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
-    return MecabWdParse(dict(FtsVals),Costs=None)
+    return MecabWdParse(dict(FtsVals),Costs=None,Freq=Freq)
 
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
@@ -1669,7 +1670,10 @@ def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=Fa
     if Fts is None:
         Fts=(DefFtsSmall if len(Vals)==8 else DefFts)
             
-    assert(len(Fts)==len(Vals))
+    assert len(Fts)<=len(Vals),"too few value columns in line\n"
+    if len(Fts)<len(Vals):
+        Vals=Vals[0:len(Fts)]
+    
     FtsVals=list(zip(Fts,Vals))
     if TupleOrDict=='dict':
         FtsVals=dict(FtsVals)
@@ -1715,7 +1719,7 @@ def pick_lines(FP,OrderedLineNums):
                 OrderedLineNums.pop(0)
                 sys.stdout.write(LiNe)
 
-def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
+def cluster_samefeat_lines(FP,RelvFts,CorpusOrDic='dic',Exclude=[]):
 #    import pdb
  #   if os.path.basename(FP)=='names.csv':
   #      pdb.set_trace()
@@ -1724,15 +1728,14 @@ def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
     with open(FP,encoding='utf8',errors='replace') as FSr:
         for Cntr,LiNe in enumerate(FSr):
             if Cntr+1%500==0:
-
                 MSs=myModule.progress_counter(MSs,Cntr,Consts)
             Line=LiNe.strip()
-            if not Line:
+            if not Line or Line=='EOS':
                 continue
-            FtEls=Line.split(',')
-            if FtEls[4] not in Exclude:
+            FtsEls=line2wdfts(Line,CorpusOrDic=CorpusOrDic)
+            if True:#FtEls[4] not in Exclude:
                 try:
-                    RelvEls=tuple([ FtEls[Ind] for Ind in Colnums ])
+                    RelvEls=tuple([ (Ft,Val) for (Ft,Val) in FtsEls.items() if Ft in RelvFts ])
                 except:
                     print('\ncluster_samefeat_lines: Column number invalid for \n')
                     print(LiNe+'\n')
