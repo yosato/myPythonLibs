@@ -1293,8 +1293,8 @@ class MecabWdParse(WordParse):
     
     def divide_stem_suffix(self,OutputObject=False,StrictP=False,OrthPron=['orth']):
         IrregTable= {
-            'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい','未然形・長音化':'eえ','未然形・長音化i':'iい','基本形・撥音便':'uん','未然形・ヤ挿入':'iや'}),
-            'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい','基本形・撥音便':'uん','未然形・長音化':'eえ','未然形・長音化o':'oお','未然形・長音化i':'iい','未然形・ヤ挿入':'iや'}),
+            'サ変':('s',{'未然形・や挿入':'iや','命令k':'eー','文語基本形':'u','未然形特殊':'e','未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい','未然形・長音化':'eえ','未然形・長音化i':'iい','基本形・撥音便':'uん','未然形・ヤ挿入':'iや'}),
+            'カ変':('k',{'未然形・や挿入':'iや','命令k':'eー','体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい','基本形・撥音便':'uん','未然形・長音化':'eえ','未然形・長音化o':'oお','未然形・長音化i':'iい','未然形・ヤ挿入':'iや'}),
             '特殊・タ':('た',{'未然形':'ろ','連用タ接続':'t','基本形':'','仮定形':'ら'}),
             '特殊・ヤ':('や',{'未然形':'ろ','連用タ接続':'t','基本形':'','体言接続':'な','仮定形':'ら'}),
             '特殊・ダ':('だ',{'未然形':'ろ','連用タ接続':'t','連用形':'で','基本形':'','仮定形':'ら','体言接続':'な'}),
@@ -1642,8 +1642,12 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Freq=None,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
     WithCost=False if CorpusOrDic=='corpus' else WithCost
     FtsVals=line2wdfts(MecabLine,CorpusOrDic=CorpusOrDic,WithCost=WithCost,Fts=Fts)
-    return MecabWdParse(dict(FtsVals),Costs=None,Freq=Freq)
-
+    try:
+        MWd=MecabWdParse(dict(FtsVals),Costs=None,Freq=Freq)
+    except:
+        print('MecabWd creation failed for '+MecabLine)
+        MWd=None
+    return MWd
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
     assert CorpusOrDic in ['dic','corpus']
