@@ -608,20 +608,20 @@ def prompt_loop_bool(Prompt,Interact=False,Default=False,TO=10,DefaultSuppress=F
         AddStr=AddStr+"[default ("+DefStr+")]"
     FullPrompt=Prompt+" Enter '[Yy](es)' or '[Nn](o)' "+AddStr+": "
     while not Sent:
-        if not Interact:
-            print(FullPrompt+' Default value is taken if you do nothing for %d secs) ' %TO )
-            SysName=platform.system()
-            if SysName=='Linux' or 'Darwin':
-                (StdIn,_,_)=select.select([sys.stdin],[],[],TO)
-                if StdIn:
-                    YesNoStr=StdIn[0].readline().strip()
-                else:
-                    YesNoStr=''
-                    DefaultSuppress=False
-            else:
-                YesNoStr=DefStr
-        else:
-            YesNoStr=input(Prompt+" Enter [Yy](es) or [Nn](o) "+AddStr+": ")
+#        if not Interact:
+#            print(FullPrompt+' Default value is taken if you do nothing for %d secs) ' %TO )
+#            SysName=platform.system()
+#            if SysName=='Linux' or 'Darwin':
+#                (StdIn,_,_)=select.select([sys.stdin],[],[],TO)
+#                if StdIn:
+#                    YesNoStr=StdIn[0].readline().strip()
+#                else:
+#                    YesNoStr=''
+#                    DefaultSuppress=False
+#            else:
+#                YesNoStr=DefStr
+#        else:
+        YesNoStr=input(Prompt+" Enter [Yy](es) or [Nn](o) "+AddStr+": ")
         YesNoBool=yesno2bool(YesNoStr)
         if (YesNoBool=='' and DefaultSuppress) or YesNoBool==None:
             print("You don't seem to have entered [Yy](es) or [Nn](o). Try again")
