@@ -596,8 +596,25 @@ def rank_list_of_tuples(LofTs,Thresh=float('inf'),EqualNorm=True):
 
     return NewLofTs
 
-def prompt_loop_bool(Prompt,Interact=False,Default=False,TO=10,DefaultSuppress=False):
+def localise_message(Lang,TO=10):
+    def prompt_msg_lang(Lang):
+        if Lang in ('en','fr'):
+            return EnterKW[Lang]+' '+YesNoString
+        elif Lang in ('kr','jp'):
+            return YesNoString+' '+EnterKW[Lang]
+    OrKW={'en':'or','jp':'か','fr':'ou'}
+    YesNoString='[Yy](es) '+OrKW[Lang]+' [Nn](o)'
+    DefaultKW={'en':'default','jp':'デフォルト'}
+    DefaultMsg={'en':'Default value is taken if you do nothing for %d seconds' %TO,'fr':'Valeur defaut est pris si vous faites rien pendant %d secondes'%TO, 'jp':'%d秒以内に応答がない場合はデフォルトの値が入力されます'%TO}
+    EnterKW={'en':'Enter','jp':'で入力してください'}
+    PromptMsg=prompt_msg_lang(Lang)
+    WrongWarn={'en':"You don't seem to enter the right value. "+PromptMsg,'jp':'入力が誤っています。'+PromptMsg}
+    return PromptMsg,DefaultMsg[Lang],WrongWarn[Lang]
+
+
+def prompt_loop_bool(Prompt,Interact=True,Default=False,TO=10,DefaultSuppress=False,Lang='en'):
     import threading,select, sys, platform
+    PromptMsg,DefaultMsg,WrongWarn=localise_message(Lang,TO=TO)
     Sent=False
     if Default:
         DefStr='yes'
@@ -605,11 +622,11 @@ def prompt_loop_bool(Prompt,Interact=False,Default=False,TO=10,DefaultSuppress=F
         DefStr='no'
     AddStr=''
     if not DefaultSuppress:
-        AddStr=AddStr+"[default ("+DefStr+")]"
-    FullPrompt=Prompt+" Enter '[Yy](es)' or '[Nn](o)' "+AddStr+": "
+        AddStr=AddStr+"["+DefaultMsg+" ("+DefStr+")]"
+    FullPrompt=Prompt+AddStr+": "
     while not Sent:
         if not Interact:
-            print(FullPrompt+' Default value is taken if you do nothing for %d secs) ' %TO )
+            print(FullPrompt+PromptMsg)
             SysName=platform.system()
             if SysName=='Linux' or 'Darwin':
                 (StdIn,_,_)=select.select([sys.stdin],[],[],TO)
@@ -621,10 +638,10 @@ def prompt_loop_bool(Prompt,Interact=False,Default=False,TO=10,DefaultSuppress=F
             else:
                 YesNoStr=DefStr
         else:
-            YesNoStr=input(Prompt+" Enter [Yy](es) or [Nn](o) "+AddStr+": ")
+            YesNoStr=input(Prompt+' ('+PromptMsg+"): ")
         YesNoBool=yesno2bool(YesNoStr)
         if (YesNoBool=='' and DefaultSuppress) or YesNoBool==None:
-            print("You don't seem to have entered [Yy](es) or [Nn](o). Try again")
+            print(WrongWarn)
         else:
             Sent=True
             if YesNoBool=='':
