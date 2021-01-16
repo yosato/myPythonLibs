@@ -1,1 +1,0 @@
-yosato@Yos-MacBook-Pro-2.local.45790
