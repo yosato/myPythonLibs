@@ -4,8 +4,13 @@ import bidict
 from pdb import set_trace
 from collections import defaultdict
 # some globals
-HomeDir=os.getenv('HOME')
-sys.path.append(HomeDir+'/myProgs/python')
+if os.name=='nt':
+    HomeDir=os.getenv('HOMEPATH')
+else:
+    HomeDir=os.getenv('HOME')
+
+assert HomeDir is not None    
+
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 

@@ -11,6 +11,11 @@ imp.reload(myModule)
 imp.reload(jp_morph)
 imp.reload(correspondences)
 
+HomeDir=os.getenv('HOMEPATH') if os.name=='nt' else os.getenv('HOME')
+assert HomeDir
+RepoDir='/cygwin64/home/motok'
+
+
 CharsWithRelatives={'カ':('ガ',),'キ':('ギ',),'ク':('グ',),'ケ':('ゲ',),'コ':('ゴ',),'サ':('ザ',),'シ':('ジ',),'ス':('ズ',),'セ':('ゼ',),'ソ':('ゾ',),'タ':('ダ',),'チ':('ヂ',),'ツ':('ヅ',),'テ':('デ',),'ト':('ド',),'ハ':('バ','パ',),'ヒ':('ピ','ビ',),'フ':('プ','ブ',),'ヘ':('ペ','ベ',),'ホ':('ポ','ボ',),'ア':('ァ',),'イ':('ィ',),'ウ':('ゥ','ヴ',),'エ':('ェ',),'オ':('ォ',),'ヤ':('ャ',),'ユ':('ュ',),'ヨ':('ョ',),'ツ':('ヅ','ッ',)}
 RelativesToChars={Rels:Char for (Char,Rels) in CharsWithRelatives.items()}
 RelativeToChar={}
@@ -581,10 +586,10 @@ def construct_tree_from_file(FP):
     return Tree(FullPaths)
 
 MecabCatFN='mecabipa_cats.txt'
-CatDir=os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/tagsets')
+CatDir=os.path.join(RepoDir,'myPythonLibs/mecabtools/tagsets')
 MecabCatFP=os.path.join(CatDir,MecabCatFN)
-MecabIPACats=construct_tree_from_file(MecabCatFP)
-CatCnt=len(MecabIPACats.comppaths)
+#MecabIPACats=construct_tree_from_file(MecabCatFP)
+#CatCnt=len(MecabIPACats.comppaths)
 Mappings=correspondences.MecabCSJ,correspondences.MecabJuman
 
 def continuous_p(Ints):
@@ -597,13 +602,13 @@ def continuous_p(Ints):
     return Bool
     
 
-for Mapping in [Mappings[0]]:
-    OrderedKeyList=sorted(myModule.flatten_list(Mapping.keys()))
-    assert(continuous_p(OrderedKeyList))
-    assert(OrderedKeyList[-1]==CatCnt)
+#for Mapping in [Mappings[0]]:
+#    OrderedKeyList=sorted(myModule.flatten_list(Mapping.keys()))
+#    assert(continuous_p(OrderedKeyList))
+#    assert(OrderedKeyList[-1]==CatCnt)
     
-MecabCSJMapping=Mappings[0]
-MecabJumanMapping=Mappings[1]
+#MecabCSJMapping=Mappings[0]
+#MecabJumanMapping=Mappings[1]
 
 def create_conversion_table(OrgTree,TgtTree,Mapping,IdioDic=None,Depth='max'):
     assert ('0id' not in Mapping.values() or IdioDic)
