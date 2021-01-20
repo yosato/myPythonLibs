@@ -1723,31 +1723,38 @@ def pick_lines(FP,OrderedLineNums):
                 OrderedLineNums.pop(0)
                 sys.stdout.write(LiNe)
 
-def cluster_samefeat_lines(FP,RelvFts,CorpusOrDic='dic',Exclude=[]):
+def cluster_samefeat_lines(FP,RelvFts,CorpusOrDic='dic',IgnoreFtsVals={}):
 #    import pdb
  #   if os.path.basename(FP)=='names.csv':
   #      pdb.set_trace()
     ContentsLines=OrderedDict()
-    MSs,Consts=None,myModule.prepare_progressconsts(FP)
-    with open(FP,encoding='utf8',errors='replace') as FSr:
+    #MSs,Consts=None,myModule.prepare_progressconsts(FP)
+    with open(FP,encoding='utf8',errors='ignore') as FSr:
         for Cntr,LiNe in enumerate(FSr):
-            if Cntr+1%500==0:
-                MSs=myModule.progress_counter(MSs,Cntr,Consts)
+     #       if Cntr+1%500==0:
+      #          MSs=myModule.progress_counter(MSs,Cntr,Consts)
             Line=LiNe.strip()
             if not Line or Line=='EOS':
                 continue
-            FtsEls=line2wdfts(Line,CorpusOrDic=CorpusOrDic)
-            if True:#FtEls[4] not in Exclude:
+            if '\t' not in Line:
+                continue
+            FtsVals=line2wdfts(Line,CorpusOrDic=CorpusOrDic)
+            if any(FtsVals[IgnoreFt]==IgnoreVal for (IgnoreFt,IgnoreVal) in IgnoreFtsVals.items()):
+                continue
+            else:
                 try:
-                    RelvEls=tuple([ (Ft,Val) for (Ft,Val) in FtsEls.items() if Ft in RelvFts ])
+                    RelvEls=tuple([ (Ft,Val) for (Ft,Val) in FtsVals.items() if Ft in RelvFts ])
                 except:
                     print('\ncluster_samefeat_lines: Column number invalid for \n')
                     print(LiNe+'\n')
                     sys.exit()
-                if RelvEls in ContentsLines.keys():
-                    ContentsLines[RelvEls].append(Line)
+                if RelvEls in ContentsLines:
+                    if Line in ContentsLines[RelvEls]:
+                        ContentsLines[RelvEls][Line].append(Cntr)
+                    else:
+                        ContentsLines[RelvEls][Line]=[Cntr]
                 else:
-                    ContentsLines[RelvEls]=[Line]
+                    ContentsLines[RelvEls]={Line:[Cntr]}
 
     return ContentsLines
 
