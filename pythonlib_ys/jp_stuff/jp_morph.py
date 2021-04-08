@@ -1,17 +1,60 @@
 import copy,sys,imp,re,os,random,subprocess,inspect,functools,itertools
 import romkan
+import bidict
 from pdb import set_trace
 from collections import defaultdict
 # some globals
-HomeDir=os.getenv('HOME')
-sys.path.append(HomeDir+'/myProgs/python')
+if os.name=='nt':
+    HomeDir=os.getenv('HOMEPATH')
+else:
+    HomeDir=os.getenv('HOME')
+
+assert HomeDir is not None    
+
 from pythonlib_ys import main as myModule
 imp.reload(myModule)
 
-def identify_phoneassimgodan_fromchar(Char):
-    OnbinsGyos={'イ音便':{'が','か'},'撥音便':{'ま','な'},'促音便':{'た','ら','わ'}}
-    return next((Onbin for Onbin in OnbinsGyos.keys() if identify_gyo(Char) in OnbinsGyos[Onbin]),None)
+CharSetsWithRelatives={'カキクケコ':'ガ|ギ|グ|ゲ|ゴ','サシスセソ':'ザ|ジ|ズ|ゼ|ゾ','タチツテト':'ダ|ヂ|ヅ|デ|ド','ハヒフヘホ':'パバ|ピビ|プブ|ペベ|ポボ'}
+CharsWithRelatives={};VoicedHalfVoiced=[]
+for CharSet,Relatives in CharSetsWithRelatives.items():
+    for Char,Relative in zip(list(CharSet),list(Relatives.split('|'))):
+        CharsWithRelatives[Char]=tuple(Relative)
+        VoicedHalfVoiced.extend(Relative)
 
+def preserved_order_sublist_p(ShorterList,LongerList):
+    LongerListCopy=copy.copy(LongerList)
+    for El in ShorterList:
+        if El not in LongerListCopy:
+            return False
+        else:
+            LongerListCopy=LongerList[LongerListCopy.index(El):]
+    return True
+        
+def okurigana_variants_p(Str1,Str2):
+    # if no kanji is involved at all, leave it
+    if not any(myModule.at_least_one_of_chartypes_p(Str,['han']) for Str in (Str1,Str2)):
+        return False
+    # the kanji content (including the order) is identical between the two
+    Kanjis1,Kanjis2=[[myModule.identify_chartype(Char) for Chars in Str] for Str in (Str1,Str2)]
+    if Kanjis1!=Kanjis2:
+        return False
+    # shorter one is preserved-order char subset of longer one
+    (Longer,Shorter)=(Str1,Str2) if Str1>Str2 else (Str2,Str1)
+    if not preserved_order_sublist_p(Shorter,Longer):
+        return False
+    return True
+    
+        
+def unvoice_char(Char,StrictP=False):
+    CharType=myModule.identify_chartype(Char)
+    assert(CharType in ['hiragana','katakana'])
+    HiraganaP=myModule.identify_chartype(Char)=='hiragana'
+    KataChar=myModule.kana2kana(Char) if  HiraganaP else Char
+    Unvoiced=next((UV for (UV,Vs) in CharsWithRelatives.items() if KataChar in Vs),None)
+    if Unvoiced and HiraganaP:
+        Unvoiced=myModule.kana2kana(Unvoiced)
+    return Unvoiced if Unvoiced else (None if StrictP else Char)
+        
 def pick_highest_charrate(Cands,CharTypes):
     return max([(Cand,chartype_rate(Cand.orth,CharTypes)) for Cand in Cands], key=lambda x:x[1])
         
@@ -164,13 +207,7 @@ def expand_product(L1,L2):
 InfCats=['助動詞','動詞','形容詞']
 
 GojuonStrH='あいうえお\nかきくけこ\nさしすせそ\nたちつてと\nなにぬねの\nはひふへほ\nまみむめも\nやいゆえよ\nらりるれろ\nわいうえを\nがぎぐげご\nざじずぜぞ\nだぢづでど\nばびぶべぼ\nぱぴぷぺぽ\nゃぃゅぇょ\nぁぃぅぇぉ'
-
-GojuonStrKLarge='アイウエオ\nカキクケコ\nサシスセソ\nタチツテト\nナニヌネノ\nハヒフヘホ\nマミムメモ\nヤイユエヨ\nラリルレロ\nワイウエヲ\nガギグゲゴ\nザジズゼゾ\nダヂヅデド\nバビブベボ\nパピプペポ'
-
-GojuonStrKSmall='ャィュェョ\nァィゥェォ'
-
-GojuonStrK=GojuonStrKLarge+'\n'+GojuonStrKSmall
-
+GojuonStrK='アイウエオ\nカキクケコ\nサシスセソ\nタチツテト\nナニヌネノ\nハヒフヘホ\nマミムメモ\nヤイユエヨ\nラリルレロ\nワイウエヲ\nガギグゲゴ\nザジズゼゾ\nダヂヅデド\nバビブベボ\nパピプペポ\nャィュェョ\nァィゥェォ'
 GojuonStrR='aiueo\nkakikukeko\nsasisuseso\tatituteto\naninuneno\nhahihuheho\nmamimumemo\nyayiyuyeyo\nwawiwuwewo\ngagigugego\nzazizuzezo\ndadidudedo\nbabibubebo\npapipupepo\nyayiyuyeyo\naiueo'
 
 GojuonDic={'んン':{'N':('ん','ン')},'っッ':{'t':('っ','ッ')}}
@@ -669,10 +706,12 @@ def all_kana(Wd):
 
 def render_kana(Wd,WhichKana='hiragana',Strict=False):
     import subprocess
+    assert (WhichKana in ['hiragana','katakana'],'output should be either hiragana or katakana')
+    OutCharFlag='H' if WhichKana=='hiragana' else 'K'
     if any(myModule.identify_chartype(Char)=='han' for Char in Wd):
-        Cmd=' '.join(['echo', Wd, 'kakasi -f utf8 -t utf8 -JH'])
+        Cmd=' '.join(['echo', Wd.strip(), '| nkf -eW | kakasi -J'+OutCharFlag,'| nkf -Ew'])
         Proc=subprocess.Popen(Cmd,shell=True,stdout=subprocess.PIPE)
-        Wd=Proc.communicate()[0].decode()
+        Wd=Proc.communicate()[0].decode().strip()
 
     Str=''
     for Char in Wd:
