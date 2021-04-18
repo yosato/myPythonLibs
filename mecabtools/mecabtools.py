@@ -38,6 +38,7 @@ HomeDir=os.getenv('HOME')
 
 DefFts=['orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation']
 DefFtsSmall=DefFts[:8]
+global DefIndsFts
 DefIndsFts={Ind:Ft for (Ind,Ft) in enumerate(DefFts)}
 # the reverse list from ft to ind
 DefFtsInds={ Ft:Ind for (Ind,Ft) in DefIndsFts.items() }
@@ -210,7 +211,7 @@ def collect_wdobjs_with_freqs(MecabCorpusFPs,TagType='ipa',StrictP=True):
                     FtEls=OrthFtStr[1].split(',')
                     if '記号' in FtEls[0]:
                         continue
-                    assert (TagType=='ipa' and len(FtEls)==9 or len(FtEls)==7) or (TagType=='kokugoken' and len(FtEls)==7)
+#                    assert (TagType=='ipa' and len(FtEls)==9 or len(FtEls)==7) or (TagType=='kokugoken' and len(FtEls)==7)
                 Fts=['orth','cat','subcat','sem','infform','infpat','lemma','pronunciation'] if TagType=='kokugoken' else None
                 WdFtsVals=line2wdfts(LiNe,'corpus',Fts=Fts)
                 WdVals=tuple(WdFtsVals.values())
@@ -816,7 +817,24 @@ def dic_or_corpus(FP,FullCheckP=True):
 def feat_count_line(Line,DicOrCorpus):
     _,Fts,_=decompose_mecabline(Line,DicOrCorpus)
     return len(Fts)
-    
+
+def invalid_lines_mecabfile(FP,DicOrCorpus,FirstOnly=False,From=None):
+    assert any(DicOrCorpus==Type for Type in ('dic','corpus'))
+    valid_p=valid_corpusline_p if DicOrCorpus=='corpus' else valid_dicline_p
+    InvalidLines=[]
+    with open(FP) as FSr:
+        for Cntr,LiNe in enumerate(FSr):
+            if From and Cntr<From:
+                continue
+            if DicOrCorpus=='corpus' and LiNe=='EOS\n':
+                continue
+            if not valid_p(LiNe):
+                Tuple=(Cntr,LiNe.strip())
+                if FirstOnly:
+                    return Tuple
+                InvalidLines.append(Tuple)
+    return InvalidLines
+
 def valid_mecabfile_p(FP,DicOrCorpus,CheckUpTo=float('inf')):
     assert any(DicOrCorpus==Type for Type in ('dic','corpus'))
     valid_p=valid_corpusline_p if DicOrCorpus=='corpus' else valid_dicline_p
@@ -837,8 +855,6 @@ def valid_mecabfile_p(FP,DicOrCorpus,CheckUpTo=float('inf')):
                 if FtLen!=feat_count_line(LiNe.strip(),DicOrCorpus):
                     sys.stderr.write(' '.join(['Offending line:',str(Cntr+1),LiNe]))
                     return False
-
-
 
     return True
 
@@ -1079,13 +1095,17 @@ def extract_costs_fromline(DicLine):
     Costs=tuple([int(Str) for Str in LineEls[1:4]])
     return Costs
 
-def pick_feats_fromline(Line,TgtFtNames,ResType,InhFtNames=None,ValueOnlyP=False,Debug=False):
+def pick_feats_fromline(Line,TgtFtNames,ResType,InhFtNames=None,InhFtNamesToAdd=[],ValueOnlyP=False,Debug=False,DefIndsFts=DefIndsFts):
+#    DefIndsFts=dict(DefIndsFts,{DefLen+Cntr:FtName for (Cntr,FtName) in enumerate(InhFtNamesToAdd)})
     assert (ResType=='dic' or ResType=='corpus')
     from bidict import bidict
     if not Line.strip():
         print('empty line encountered')
         return None
-    InhFtIndsNames={Ind:Ft for (Ind,Ft) in enumerate(InhFtNames)} if InhFtNames else DefIndsFts
+    if InhFtNamesToAdd:
+        DefLen=10
+        DefIndsFts=dict(DefIndsFts,{DefLen+Cntr:FtName for (Cntr,FtName) in enumerate(InhFtNamesToAdd)})
+    InhFtIndsNames={Ind:Ft for (Ind,Ft) in enumerate(InhFtNames)} if InhFtNames else DefIndsFts  
     FullIndsFts=InhFtIndsNames if ResType=='corpus' else add_costs(InhFtIndsNames)
     FullIndsFts=bidict(FullIndsFts)
 
@@ -1096,8 +1116,9 @@ def pick_feats_fromline(Line,TgtFtNames,ResType,InhFtNames=None,ValueOnlyP=False
     LineElCnt=len(LineEls)
     LineInhFtEls=LineEls[:1]+LineEls[4:] if ResType=='dic' else LineEls
     LineInhFtCnt=len(LineInhFtEls)
+    SpecInhFtCnt=len(InhFtNames) if InhFtNames else len(FullIndsFts)
     #checking line has the specified number of feats and costs
-    assert(LineInhFtCnt==len(InhFtNames) and len(LineEls)==len(FullIndsFts))
+#    assert (LineInhFtCnt==SpecInhFtCnt), 'feat count needs to match between line ('+str(LineInhFtCnt)+') and spec ('+str(SpecInhFtCnt)+')'
 
     TgtInds=[ Ind for (Ind,FtName) in FullIndsFts.items() if FtName in TgtFtNames ]
 
@@ -1208,7 +1229,7 @@ class WordParse(Word):
         return FtStr
 
 class MecabWdParse(WordParse):        
-    def __init__(self,AVPairs,Costs=None,Freq=None,InhAtts=('orth','cat','subcat','subcat2','sem','lemma','reading','infpat','infform'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
+    def __init__(self,AVPairs,Costs=None,Freq=None,InhAtts=('orth','cat','subcat','subcat2','sem','infpat','infform','lemma','reading','pronunciation'),IdentityAtts=('orth','cat','subcat','infform','infpat','pronunciation')):
         if 'pronunciation' not in AVPairs:
             if  myModule.all_of_chartypes_p(AVPairs['orth'],['hiragana','katakana']):
                 Reading=jp_morph.render_kana(AVPairs['orth'],WhichKana='katakana')
@@ -1641,7 +1662,14 @@ def mecabfile2mecabsents(MecabFP):
         yield MecabSentParse(MecabWds)
     
     
-
+def featsvals_in_line_p(Line,TgtFtsVals,ResType='corpus',InhFtNames=None,InhFtNamesToAdd=[]):
+    Bool=False
+    TgtFtsVals=TgtFtsVals if type(TgtFtsVals).__name__=='tuple' else TgtFtsVals.items()
+    TgtFts=[Ft for (Ft,Val) in TgtFtsVals] 
+    FtsVals=pick_feats_fromline(Line,TgtFts,ResType,InhFtNames=InhFtNames,InhFtNamesToAdd=InhFtNamesToAdd)
+    FtsVals=dict(FtsVals)
+    return all(FtsVals[Ft]==TgtVal for (Ft,TgtVal) in TgtFtsVals)
+        
     
 def mecabline2mecabwd(MecabLine,CorpusOrDic,Freq=None,Fts=None,WithCost=True):
     WithCost=True if WithCost else False
@@ -1653,6 +1681,7 @@ def mecabline2mecabwd(MecabLine,CorpusOrDic,Freq=None,Fts=None,WithCost=True):
         print('MecabWd creation failed for '+MecabLine)
         MWd=None
     return MWd
+
 def line2wdfts(Line,CorpusOrDic='corpus',TupleOrDict='dict',Fts=None,WithCost=False):
     assert Fts is None or type(Fts).__name__=='list'
     assert CorpusOrDic in ['dic','corpus']

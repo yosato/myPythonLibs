@@ -1,3 +1,8 @@
+###### THIS IS
+###### AN OLD COPY!!!
+##### USE the one in the subdir jp_stuff !!!!!!
+######
+
 import copy,sys,imp,re,os,random,subprocess,inspect,functools,itertools
 import romkan
 import bidict

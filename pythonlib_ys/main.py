@@ -1,8 +1,32 @@
-import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil,collections
+import re,copy, imp,math, datetime,time,itertools, os, sys, subprocess,pickle,inspect,json,shutil,collections, unicodedata,glob
 
 from collections import abc as abc
 
 from pdb import set_trace
+
+def normalise_chars_dir(Dir,Ext='txt',NoChangeNoFile=True):
+    FPs=glob.glob(os.path.join(Dir,'*.'+Ext))
+    for FP in FPs:
+        NoChangeP=normalise_chars_file(FP,OutFP=FP+'.charnormed')
+        if NoChangeNoFile and NoChangeP:
+            os.remove(FP+'.charnormed')
+
+def normalise_chars_file(FP,OutFP=None,Exceptions={},OnlyBits=None):
+    Out=open(OutFP,'wt') if OutFP else sys.stdout
+    NoChangeP=True
+    with open(FP) as FSr:
+        for LiNe in FSr:
+            Normed=unicodedata.normalize('NFKC',LiNe)
+            FndExcepts=[Except for Except in  Exceptions.keys() if Except in Normed]
+            for Except in FndExcepts:
+                Normed=Normed.replace(Except,Exceptions[Except])
+            Out.write(Normed)
+            if Normed!=LiNe:
+                NoChangeP=False
+
+    if OutFP:
+        Out.close()
+    return NoChangeP
 
 def sv2ftsvals(SVFP,Delim):
     return sv2featsvals(SVFP,Delim)
